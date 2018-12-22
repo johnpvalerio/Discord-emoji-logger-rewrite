@@ -241,4 +241,4 @@ async def close(ctx):
     print(quit)
 
 
-bot.run('NDc2MTAyNDc5OTAyNDA4NzM0.Dkos7g.hp3OmAiAp5GPcF15dsnj0gjYp4E', bot=True)
+bot.run('', bot=True)
