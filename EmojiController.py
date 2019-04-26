@@ -30,7 +30,7 @@ class Controller(commands.Cog):
                                            ctx.guild.text_channels)):
             # print(current_channel)
             await self.model.log_channel(current_channel)
-        # self.view.db()
+        await self.view.db(ctx)
 
     @commands.command()
     async def re(self, ctx, args):
@@ -43,4 +43,4 @@ class Controller(commands.Cog):
 
     @commands.command('graph')
     async def plot(self, ctx):
-        self.view.graph(ctx)
+        await self.view.graph(ctx)
