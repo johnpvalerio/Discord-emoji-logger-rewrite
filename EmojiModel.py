@@ -42,26 +42,9 @@ class Model(commands.Cog):
         date_max_index = len(date_list) - 1
         async for message in channel.history(limit=None, before=date_stop, after=date_after):
 
+            # move date to next closest
             while message.created_at >= date_list[date_index]:
                 date_index = date_index + 1
-                print('>', date_list[date_index], '<')
-
-                for emoji_ID, emoji_obj in self.db[channel.guild.id][date_list[date_index]].items():
-                    if self.db[channel.guild.id][date_list[date_index]][emoji_ID].instance_count < \
-                            self.db[channel.guild.id][date_list[date_index - 1]][emoji_ID].instance_count:
-                        for i in range(date_index, len(date_list)):
-                            self.db[channel.guild.id][date_list[i]][emoji_ID].instance_count = \
-                                self.db[channel.guild.id][date_list[i - 1]][emoji_ID].instance_count
-                            if emoji_ID == 441317516984320010:
-                                print('\t[',
-                                      self.db[channel.guild.id][date_list[date_index]][441317516984320010].instance_count,
-                                      ' - ', date_list[i], ']')
-                                # print('\t', message.content)
-
-                    if self.db[channel.guild.id][date_list[date_index]][emoji_ID].total_count < \
-                            self.db[channel.guild.id][date_list[date_index - 1]][emoji_ID].total_count:
-                        self.db[channel.guild.id][date_list[date_index]][emoji_ID].total_count = \
-                        self.db[channel.guild.id][date_list[date_index - 1]][emoji_ID].total_count
                 if date_max_index == date_index:
                     return
             # skip if message from the bot
@@ -86,64 +69,24 @@ class Model(commands.Cog):
             # update emoji counts
             for emoji in set(emoji_found):
                 emoji_count = emoji_found.count(emoji)
+                self.update_data(channel_id=channel.guild.id, date_index=date_index, date_list=date_list,
+                                 emoji_ID=int(emoji[-19:-1]), inst_inc=1, total_inc=emoji_count)
 
-                self.db[channel.guild.id][date_list[date_index]][int(emoji[-19:-1])].instance_count += 1
-
-                if int(emoji[-19:-1]) == 441317516984320010:
-                    print(self.db[channel.guild.id][date_list[date_index]][441317516984320010].instance_count, ' - ',
-                          date_list[date_index])
-                    print('\t', message.content)
-
-                self.db[channel.guild.id][date_list[date_index]][int(emoji[-19:-1])].total_count += emoji_count
-            self.update_data(channel, date_index, date_list)
-
-        for date, val2 in self.db[channel.guild.id].items():
-            for emoji_ID, emoji_obj in self.db[channel.guild.id][date].items():
-                print('\t', emoji_obj.emoji_obj.name, ': ', emoji_obj.instance_count, ' - ', emoji_obj.total_count)
-            print('\t\t - - - -')
-        print('\t\t . . . . . . .')
-
-    def update_data(self, channel, date_index, date_list):
+    # update stats for given emoji in upcoming dates
+    def update_data(self, channel_id, date_index, date_list, emoji_ID, inst_inc, total_inc):
         next_dates = []
         for i in range(date_index, len(date_list)):
+            print('\t\t',i)
             next_dates.append(date_list[i])
-        for cur_date in next_dates:
-            for emoji_ID, emoji_obj in self.db[channel.guild.id][cur_date].items():
-                print(emoji_ID)
-                if int(emoji_ID) == 441317516984320010:
-                    print('========')
-                    print(channel.name)
-                    print('\t',self.db[channel.guild.id][date_list[date_index+1]][441317516984320010].instance_count, ' - ', date_list[date_index+1])
-                    print('\t',self.db[channel.guild.id][date_list[date_index]][441317516984320010].instance_count, ' - ', date_list[date_index])
-                    print('\t',self.db[channel.guild.id][date_list[date_index-1]][441317516984320010].instance_count, ' - ', date_list[date_index-1])
-                    print('========')
-                if self.db[channel.guild.id][date_list[date_index]][emoji_ID].instance_count < \
-                        self.db[channel.guild.id][date_list[date_index - 1]][emoji_ID].instance_count:
-                    print('\t===LOOP===')
-                    for i in range(date_index, len(date_list)):
-                        print('\t', self.db[channel.guild.id][date_list[i]][emoji_ID].instance_count)
-                        self.db[channel.guild.id][date_list[i]][emoji_ID].instance_count = \
-                            self.db[channel.guild.id][date_list[i - 1]][emoji_ID].instance_count
-                        print('\t', self.db[channel.guild.id][date_list[i]][emoji_ID].instance_count)
-                else:
-                    if emoji_ID == 441317516984320010:
-                        print('\t===ELSE===')
-                    for i in range(date_index, len(date_list)):
-                        if i != len(date_list)-1:
-                            self.db[channel.guild.id][date_list[i+1]][emoji_ID].instance_count = self.db[channel.guild.id][date_list[i]][emoji_ID].instance_count
-
-                if self.db[channel.guild.id][date_list[date_index]][emoji_ID].total_count < \
-                        self.db[channel.guild.id][date_list[date_index - 1]][emoji_ID].total_count:
-                    self.db[channel.guild.id][date_list[date_index]][emoji_ID].total_count = \
-                        self.db[channel.guild.id][date_list[date_index - 1]][emoji_ID].total_count
-            print(' [ ] [ ] [ ] [ ]')
+        for date in next_dates:
+            print(date)
+            self.db[channel_id][date][emoji_ID].instance_count += inst_inc
+            self.db[channel_id][date][emoji_ID].total_count += total_inc
 
     async def compile_dates(self, guild):
         date_list = []
         cur_date = guild.created_at
         cur_date = cur_date.replace(month=cur_date.month + 1, day=1)
-        # print(cur_date)
-
         while cur_date < datetime.datetime.now():
             date_list.append(cur_date)
             if cur_date.month == 12:
