@@ -47,10 +47,8 @@ class View(commands.Cog):
             for date in dates:
                 emoji_obj = self.model.db[ctx.guild.id][date][id]
                 emoji_list.append(emoji_obj.instance_count)
-            # print(type(str(emoji_obj.emoji_obj.url)))
             line = plt.plot(dates, emoji_list, label=' - ' + emoji_obj.emoji_obj.name)
             lines.append(line[0])
-            # lines.append(line)
             url.append(str(emoji_obj.emoji_obj.url))
             emoji_list = []
 

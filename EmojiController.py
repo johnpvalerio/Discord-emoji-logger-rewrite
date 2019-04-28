@@ -35,11 +35,12 @@ class Controller(commands.Cog):
     @commands.command()
     async def re(self, ctx, args):
         print(args)
-        await self.view.print(ctx,args)
+        await self.view.print(ctx, args)
 
     @commands.command('exp')
     async def export(self, ctx, *args):
         self.model.export()
+        await self.view.print(ctx, 'done')
 
     @commands.command('graph')
     async def plot(self, ctx):
