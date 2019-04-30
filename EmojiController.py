@@ -18,18 +18,27 @@ class Controller(commands.Cog):
             str_output += '**' + word + '**' + ' '
         print(str_output)
         await self.view.print(ctx, str_output)
-        # await ctx.send(str_output)
 
     @commands.command()
-    async def log(self, ctx):
+    @commands.has_permissions(administrator=True)
+    async def log(self, ctx, *args):
         print("\n--------------------------")
         print('[COMMAND] - log()')
         print("--------------------------")
+        if args == ():
+            args = ''
+            cur_date = list(self.model.db[ctx.guild.id])[-1]
+            await self.model.prepare_db(ctx.guild.id, cur_date)
         for current_channel in list(filter(lambda channel:
                                            channel.permissions_for(ctx.guild.me).read_messages,
                                            ctx.guild.text_channels)):
-            # print(current_channel)
-            await self.model.log_channel(current_channel)
+            if args in ['n', 'new']:
+                await self.model.log_channel(current_channel)
+            else:
+                # log from last saved
+                await self.model.log_channel(current_channel, cur_date)
+                print('continue')
+        # todo: if continue, add missing data from last iteration
         await self.view.db(ctx)
 
     @commands.command()
@@ -38,6 +47,7 @@ class Controller(commands.Cog):
         await self.view.print(ctx, args)
 
     @commands.command('exp')
+    @commands.has_permissions(administrator=True)
     async def export(self, ctx, *args):
         self.model.export()
         await self.view.print(ctx, 'done')

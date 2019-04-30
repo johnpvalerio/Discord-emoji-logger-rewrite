@@ -8,43 +8,54 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db
 
+
 class Model(commands.Cog):
+
     def __init__(self, bot):
         self.db = {}
         self.bot = bot
-        print(self.db)
         print('Model ON')
 
     @commands.Cog.listener()
     async def on_ready(self):
-        # todo: remove (kept to remember compile_dates use)
-
-        # for guild in self.bot.guilds:
-        #     self.db[guild.id] = {}
-        #     print('guild: ', type(guild.id))
-        #     date_list = await self.compile_dates(guild)
-        #     for date in date_list:
-        #         print(type(date))
-        #         server_emoji = await self.compile_emoji()
-        #         self.db[guild.id][date] = server_emoji
-
-        # todo: update dates to be datetime type, update emoji values to be emoji_object type
         cred = credentials.Certificate('firebase_admin.json')
         firebase_admin.initialize_app(cred, {
-            'databaseURL': 'https://discord-emoji-stat.firebaseio.com/'
-        })
+            'databaseURL': 'https://discord-emoji-stat.firebaseio.com/'})
         ref = db.reference('')
         self.db = self.fix_db(ref.get())
+
+        # if empty
+        if self.db == {}:
+            for guild in self.bot.guilds:
+                self.db[guild.id] = {}
+                await self.prepare_db(guild.id)
         print(self.db)
         print('Ready')
 
-    async def log_channel(self, channel):
+    # def prepare_db(self, guild_ID, date_list = None):
+    async def prepare_db(self, guild_ID, start_date= None):
+        # start from beginning
+        if start_date is None:
+            date_list = await self.next_dates(self.bot.get_guild(guild_ID).created_at)
+        else:
+            date_list = await self.next_dates(start_date)
+            # ignore first entry (last processed date)
+            date_list = date_list[1:]
+        for date in date_list:
+            server_emoji = await self.compile_emoji(guild_ID)
+            self.db[guild_ID][date] = server_emoji
+
+    async def log_channel(self, channel, start_date=None):
         date_list = []
+        if start_date is None:
+            start_date = channel.created_at
         for date in self.db[channel.guild.id]:
             date_list.append(date)
-        await self.log_emoji(channel, channel.created_at, datetime.datetime.now(), date_list)
+        await self.log_emoji(channel, start_date, datetime.datetime.now(), date_list)
         print(channel)
 
+    # date_list might be able to mitigate it?
+    # compile emoji in all channels between given dates
     async def log_emoji(self, channel, date_after, date_stop, date_list):
         date_index = 0
         date_max_index = len(date_list) - 1
@@ -89,26 +100,31 @@ class Model(commands.Cog):
             self.db[channel_id][date][emoji_ID].instance_count += inst_inc
             self.db[channel_id][date][emoji_ID].total_count += total_inc
 
-    # creates list of dates not yet filled
-    async def compile_dates(self, guild, cur_date):
+    async def next_dates(self, start_date):
+        """
+        Creates list of dates not yet processed, from last entered to now
+        @param start_date: starting datetime date
+        @return: list of datetime
+        """
         date_list = []
-        if cur_date is None:
-            cur_date = guild.created_at
-        cur_date = cur_date.replace(month=cur_date.month + 1, day=1)
-        while cur_date < datetime.datetime.now():
-            date_list.append(cur_date)
-            if cur_date.month == 12:
-                cur_date = cur_date.replace(year=cur_date.year + 1, month=1)
-            else:
-                cur_date = cur_date.replace(month=cur_date.month + 1)
+
+        # set dates from start to now
+        while start_date < datetime.datetime.now():
+            start_date = self.format_date(start_date)
+            date_list.append(start_date)
         return date_list
 
-    async def compile_emoji(self):
-        emojis = self.bot.emojis
+    def format_date(self, date):
+        if date.month == 12:
+            return date.replace(year=date.year + 1, month=1)
+        else:
+            return date.replace(month=date.month + 1)
+
+    async def compile_emoji(self, guild_ID):
+        emojis = self.bot.get_guild(guild_ID).emojis
         emoji_dict = {}
         for current_emoji in emojis:
             emoji_dict[current_emoji.id] = EmojiStat.EmojiStat(current_emoji)
-            print('id: ', type(current_emoji.id))
         return emoji_dict
 
     def export(self):
@@ -123,20 +139,22 @@ class Model(commands.Cog):
             json.dump(temp_db, write_file, indent=2, default=encoder_json)
 
     def fix_db(self, database):
+        """
+        Converts FireBase file content into proper manageable objects (datetime & EmojiStat)
+        @param database: Dictionary FireBase content
+        @return: Dictionary of FireBase content into proper objects
+        """
         temp_db = {}
-        emoji_val = []
         for guild in database:
-            print('guild:',guild)
             temp_date = {}
             for date in database[guild]:
-                print('\tdate:', date)
                 temp_emoji = {}
                 for emoji_ID in database[guild][date]:
                     emoji_val = []
-                    print('\t\temoji ID:', emoji_ID)
                     for word, val in database[guild][date][emoji_ID].items():
                         emoji_val.append(val)
-                    temp_emoji[int(emoji_ID)] = EmojiStat.EmojiStat(self.bot.get_emoji(int(emoji_ID)), emoji_val[0], emoji_val[1])
+                    temp_emoji[int(emoji_ID)] = EmojiStat.EmojiStat(self.bot.get_emoji(int(emoji_ID)), emoji_val[0],
+                                                                    emoji_val[1])
                 date_obj = datetime.datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
                 temp_date[date_obj] = temp_emoji
             temp_db[int(guild)] = temp_date
@@ -147,7 +165,6 @@ class Model(commands.Cog):
 def encoder_json(file_object):
     print(str(file_object), ' - ', type(file_object))
     if isinstance(file_object, EmojiStat.EmojiStat):
-        # return file_object.instance_count, file_object.total_count
         return {'instance_count': file_object.instance_count, 'total_count': file_object.total_count}
     if isinstance(file_object, datetime.datetime):
         return file_object.__str__()
