@@ -18,11 +18,12 @@ class Model(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        cred = credentials.Certificate('firebase_admin.json')
-        firebase_admin.initialize_app(cred, {
-            'databaseURL': 'https://discord-emoji-stat.firebaseio.com/'})
-        ref = db.reference('')
-        self.db = self.fix_db(ref.get())
+        # todo: if new server, add guild id
+        # cred = credentials.Certificate('firebase_admin.json')
+        # firebase_admin.initialize_app(cred, {
+        #     'databaseURL': 'https://discord-emoji-stat.firebaseio.com/'})
+        # ref = db.reference('')
+        # self.db = self.fix_db(ref.get())
 
         # if empty
         if self.db == {}:
@@ -54,7 +55,7 @@ class Model(commands.Cog):
         await self.log_emoji(channel, start_date, datetime.datetime.now(), date_list)
         print(channel)
 
-    # date_list might be able to mitigate it?
+    # todo: total_count is weird sometimes
     # compile emoji in all channels between given dates
     async def log_emoji(self, channel, date_after, date_stop, date_list):
         date_index = 0

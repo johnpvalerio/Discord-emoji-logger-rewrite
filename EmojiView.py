@@ -1,5 +1,6 @@
 import aiofiles as aiofiles
 import aiohttp
+import math
 from discord.ext import commands
 import matplotlib.pyplot as plt
 import matplotlib.lines
@@ -29,29 +30,61 @@ class View(commands.Cog):
             print(date)
         await ctx.send('complete')
 
+    # todo: overlap problems
+    async def pie(self, ctx):
+        labels = []
+        values = []
+        latest_date = list(self.model.db[ctx.guild.id])[-1]
+        for emoji in self.model.db[ctx.guild.id][latest_date]:
+            labels.append(self.model.db[ctx.guild.id][latest_date][emoji].emoji_obj.name)
+            values.append(self.model.db[ctx.guild.id][latest_date][emoji].instance_count)
+        fig, ax = plt.subplots()
+        ax.pie(values, labels=labels, autopct='%1.1f%%')
+        ax.axis('equal')
+        fig = plt.gcf()
+        plt.show()
+        plt.draw()
+        fig.savefig('pie.png')
+        await ctx.send(file=discord.File('pie.png'))
+
+    #todo: legend ordering
+    # do last 3 months graph data
+    # ignore 0's (twitch emotes)
     async def graph(self, ctx):
         dates = []  # dates
         emoji_IDs = []  # emoji ID
-        emoji_list = []  # emoji object
+        emoji_list = []  # emoji object (line)
         url = []  # emoji URL
         lines = []  # graph lines
         img = []
+
+        counter = 0
+        LEGEND_COUNT = 10
+
         # dates: x
         for date in self.model.db[ctx.guild.id]:
             dates.append(date)
-        # # emoji ID
+        # emoji ID
+        # todo: use db emojis, remove 0's
         for emoji in ctx.guild.emojis:
             emoji_IDs.append(emoji.id)
         # emoji
+        # todo: fix for large values
+        # for i in range(4):
         for id in emoji_IDs:
             for date in dates:
                 emoji_obj = self.model.db[ctx.guild.id][date][id]
                 emoji_list.append(emoji_obj.instance_count)
-            line = plt.plot(dates, emoji_list, label=' - ' + emoji_obj.emoji_obj.name)
-            lines.append(line[0])
+            if counter < LEGEND_COUNT:
+                line, = plt.plot(dates, emoji_list, label=' - ' + emoji_obj.emoji_obj.name)
+            else:
+                line, = plt.plot(dates, emoji_list)
+            lines.append(line)
             url.append(str(emoji_obj.emoji_obj.url))
             emoji_list = []
+            counter += 1
 
+        # adding images in the legend
         for i in range(len(url)):
             async with aiohttp.ClientSession() as session:
                 url_link = url[i]
@@ -62,7 +95,11 @@ class View(commands.Cog):
                         await f.close()
                         img.append(HandlerLineImage('emoji.png'))
         legend_obj = dict(zip(lines, img))
+        # plt.legend(handler_map=legend_obj, ncol=math.ceil(len(lines) / 10))
         plt.legend(handler_map=legend_obj)
+        plt.grid(True)
+        plt.title("Time series of emote use in " + ctx.guild.name)
+
         fig = plt.gcf()
         plt.show()
         plt.draw()

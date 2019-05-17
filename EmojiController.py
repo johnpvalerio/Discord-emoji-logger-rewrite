@@ -25,10 +25,13 @@ class Controller(commands.Cog):
         print("\n--------------------------")
         print('[COMMAND] - log()')
         print("--------------------------")
+        print(args)
         if args == ():
             args = ''
             cur_date = list(self.model.db[ctx.guild.id])[-1]
             await self.model.prepare_db(ctx.guild.id, cur_date)
+        else:
+            args = 'n'
         for current_channel in list(filter(lambda channel:
                                            channel.permissions_for(ctx.guild.me).read_messages,
                                            ctx.guild.text_channels)):
@@ -55,3 +58,7 @@ class Controller(commands.Cog):
     @commands.command('graph')
     async def plot(self, ctx):
         await self.view.graph(ctx)
+
+    @commands.command('pie')
+    async def pie(self, ctx):
+        await self.view.pie(ctx)
