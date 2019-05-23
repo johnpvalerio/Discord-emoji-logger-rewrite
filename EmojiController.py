@@ -26,10 +26,13 @@ class Controller(commands.Cog):
         print('[COMMAND] - log()')
         print("--------------------------")
         print(args)
+        # log from last compiled
         if args == ():
             args = ''
             cur_date = list(self.model.db[ctx.guild.id])[-1]
+            print('FROM LAST', cur_date)
             await self.model.prepare_db(ctx.guild.id, cur_date)
+        # log from the start
         else:
             args = 'n'
         for current_channel in list(filter(lambda channel:

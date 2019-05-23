@@ -1,3 +1,5 @@
+# import copy
+
 import aiofiles as aiofiles
 import aiohttp
 import math
@@ -47,42 +49,55 @@ class View(commands.Cog):
         fig.savefig('pie.png')
         await ctx.send(file=discord.File('pie.png'))
 
-    #todo: legend ordering
+    # todo: legend ordering
     # do last 3 months graph data
     # ignore 0's (twitch emotes)
     async def graph(self, ctx):
         dates = []  # dates
-        emoji_IDs = []  # emoji ID
-        emoji_list = []  # emoji object (line)
+        list_graph_emoji = []  # emoji object (line)
         url = []  # emoji URL
         lines = []  # graph lines
         img = []
+        temp = {}
 
         counter = 0
         LEGEND_COUNT = 10
 
         # dates: x
+        # last 3 dates
         for date in self.model.db[ctx.guild.id]:
             dates.append(date)
-        # emoji ID
-        # todo: use db emojis, remove 0's
-        for emoji in ctx.guild.emojis:
-            emoji_IDs.append(emoji.id)
+        dates = dates[-4:-1]
+
         # emoji
         # todo: fix for large values
-        # for i in range(4):
-        for id in emoji_IDs:
-            for date in dates:
-                emoji_obj = self.model.db[ctx.guild.id][date][id]
-                emoji_list.append(emoji_obj.instance_count)
-            if counter < LEGEND_COUNT:
-                line, = plt.plot(dates, emoji_list, label=' - ' + emoji_obj.emoji_obj.name)
-            else:
-                line, = plt.plot(dates, emoji_list)
-            lines.append(line)
-            url.append(str(emoji_obj.emoji_obj.url))
-            emoji_list = []
-            counter += 1
+        # plot lines: dates & list_graph_emoji (inst_count)
+
+        # for id in self.model.db[ctx.guild.id][dates]:
+        #     for date in dates:
+        #         emoji_obj = self.model.db[ctx.guild.id][date][id]
+        #         list_graph_emoji.append(emoji_obj.instance_count)
+        #     if counter < LEGEND_COUNT:
+        #         line, = plt.plot(dates, list_graph_emoji, label=' - ' + emoji_obj.emoji_obj.name)
+        #     else:
+        #         line, = plt.plot(dates, list_graph_emoji)
+        #     lines.append(line)
+        #     url.append(str(emoji_obj.emoji_obj.url))
+        #     list_graph_emoji = []
+        #     counter += 1
+
+        # temp holds list of date & instance count keyed by emoji ID
+        for date in dates:
+            for id in self.model.db[ctx.guild.id][date]:
+                if id not in temp.keys():
+                    temp[id] = {'date': [], 'count': []}
+                temp[id]['count'].append(self.model.db[ctx.guild.id][date][id].instance_count)
+                temp[id]['date'].append(date)
+                print(id)
+                print(temp[id])
+            print()
+
+        # todo: create lines
 
         # adding images in the legend
         for i in range(len(url)):

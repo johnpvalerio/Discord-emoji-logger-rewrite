@@ -18,33 +18,48 @@ class Model(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        # todo: if new server, add guild id
-        # cred = credentials.Certificate('firebase_admin.json')
-        # firebase_admin.initialize_app(cred, {
-        #     'databaseURL': 'https://discord-emoji-stat.firebaseio.com/'})
-        # ref = db.reference('')
-        # self.db = self.fix_db(ref.get())
+        cred = credentials.Certificate('firebase_admin.json')
+        firebase_admin.initialize_app(cred, {
+            'databaseURL': 'https://discord-emoji-stat.firebaseio.com/'})
+        ref = db.reference('')
+        self.db = self.fix_db(ref.get())
 
-        # if empty
-        if self.db == {}:
-            for guild in self.bot.guilds:
+        # add new guilds
+        for guild in self.bot.guilds:
+            # new database or new guild
+            if self.db == {} or not self.db[guild.id]:
                 self.db[guild.id] = {}
                 await self.prepare_db(guild.id)
+
+        # if empty
+        # if self.db == {}:
+        #     for guild in self.bot.guilds:
+        #         self.db[guild.id] = {}
+        #         await self.prepare_db(guild.id)
         print(self.db)
         print('Ready')
 
-    # def prepare_db(self, guild_ID, date_list = None):
-    async def prepare_db(self, guild_ID, start_date= None):
+    async def prepare_db(self, guild_ID, start_date=None):
+        """
+        Sets database db to contain date & server emojis
+        @param guild_ID: server guild ID integer
+        @param start_date: starting date to initialize datetime
+        @return: None
+        """
+
         # start from beginning
         if start_date is None:
             date_list = await self.next_dates(self.bot.get_guild(guild_ID).created_at)
+        # start from date given
         else:
             date_list = await self.next_dates(start_date)
             # ignore first entry (last processed date)
             date_list = date_list[1:]
+        # add emojis
+        dict_emojis = await self.compile_emoji(guild_ID)
         for date in date_list:
-            server_emoji = await self.compile_emoji(guild_ID)
-            self.db[guild_ID][date] = server_emoji
+            print(dict_emojis)
+            self.db[guild_ID][date] = dict_emojis
 
     async def log_channel(self, channel, start_date=None):
         date_list = []
@@ -122,8 +137,15 @@ class Model(commands.Cog):
             return date.replace(month=date.month + 1)
 
     async def compile_emoji(self, guild_ID):
+        """
+        Creates dictionary of emoji ID and emojitStat object
+        @param guild_ID: guild ID integer
+        @return: emoji_dict[emoji ID] = EmojiStat (object)
+        """
+        # emojis for current guild ID
         emojis = self.bot.get_guild(guild_ID).emojis
         emoji_dict = {}
+        # Add into dictionary newly created EmojiStat object
         for current_emoji in emojis:
             emoji_dict[current_emoji.id] = EmojiStat.EmojiStat(current_emoji)
         return emoji_dict
