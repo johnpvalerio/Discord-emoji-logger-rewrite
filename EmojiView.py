@@ -88,34 +88,52 @@ class View(commands.Cog):
 
         # temp holds list of date & instance count keyed by emoji ID
         for date in dates:
-            for id in self.model.db[ctx.guild.id][date]:
-                if id not in temp.keys():
-                    temp[id] = {'date': [], 'count': []}
-                temp[id]['count'].append(self.model.db[ctx.guild.id][date][id].instance_count)
-                temp[id]['date'].append(date)
-                print(id)
-                print(temp[id])
-            print()
+            for emoji_id in self.model.db[ctx.guild.id][date]:
+                # if emoji not yet processed
+                if emoji_id not in temp.keys():
+                    temp[emoji_id] = {'date': [], 'count': []}
+                # todo: if no data for that date, next
+                temp[emoji_id]['count'].append(self.model.db[ctx.guild.id][date][emoji_id].instance_count)
+                temp[emoji_id]['date'].append(date)
 
         # todo: create lines
+        print(temp)
+        for emoji, y in temp.items():
+            # print(y['date'], ' - ', y['count'])
+            line, = plt.plot(y['date'], y['count'], label=emoji, marker='>')
+            if not lines:
+                print('LINES')
+                print(y['date'])
+                for i in y['date']:
+                    print(i)
+                # line, = plt.plot(y['date'], y['count'], label=emoji, marker='>')
+                print(y['date'])
+                print(y['count'])
+                # lines.append(line)
+            else:
+                print('NO')
+
+
 
         # adding images in the legend
-        for i in range(len(url)):
-            async with aiohttp.ClientSession() as session:
-                url_link = url[i]
-                async with session.get(url_link) as resp:
-                    if resp.status == 200:
-                        f = await aiofiles.open('emoji.png', mode='wb')
-                        await f.write(await resp.read())
-                        await f.close()
-                        img.append(HandlerLineImage('emoji.png'))
-        legend_obj = dict(zip(lines, img))
-        # plt.legend(handler_map=legend_obj, ncol=math.ceil(len(lines) / 10))
-        plt.legend(handler_map=legend_obj)
+        # for i in range(len(url)):
+        #     async with aiohttp.ClientSession() as session:
+        #         url_link = url[i]
+        #         async with session.get(url_link) as resp:
+        #             if resp.status == 200:
+        #                 f = await aiofiles.open('emoji.png', mode='wb')
+        #                 await f.write(await resp.read())
+        #                 await f.close()
+        #                 img.append(HandlerLineImage('emoji.png'))
+        # legend_obj = dict(zip(lines, img))
+        #
+        # # plt.legend(handler_map=legend_obj, ncol=math.ceil(len(lines) / 10))
+        # plt.legend(handler_map=legend_obj)
         plt.grid(True)
         plt.title("Time series of emote use in " + ctx.guild.name)
 
         fig = plt.gcf()
+        fig.autofmt_xdate()
         plt.show()
         plt.draw()
         fig.savefig('graph.png', bbox_inches='tight')
