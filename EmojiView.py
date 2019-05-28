@@ -50,6 +50,7 @@ class View(commands.Cog):
         await ctx.send(file=discord.File('pie.png'))
 
     # todo: legend ordering
+    # note: matplotlib creates x axis if not enough/too little distance from start/end
     # do last 3 months graph data
     # ignore 0's (twitch emotes)
     async def graph(self, ctx):
@@ -106,34 +107,35 @@ class View(commands.Cog):
                 print(y['date'])
                 for i in y['date']:
                     print(i)
-                # line, = plt.plot(y['date'], y['count'], label=emoji, marker='>')
+                line, = plt.plot(y['date'], y['count'], label=emoji, marker='>')
                 print(y['date'])
                 print(y['count'])
-                # lines.append(line)
+                lines.append(line)
             else:
                 print('NO')
 
 
 
         # adding images in the legend
-        # for i in range(len(url)):
-        #     async with aiohttp.ClientSession() as session:
-        #         url_link = url[i]
-        #         async with session.get(url_link) as resp:
-        #             if resp.status == 200:
-        #                 f = await aiofiles.open('emoji.png', mode='wb')
-        #                 await f.write(await resp.read())
-        #                 await f.close()
-        #                 img.append(HandlerLineImage('emoji.png'))
-        # legend_obj = dict(zip(lines, img))
-        #
-        # # plt.legend(handler_map=legend_obj, ncol=math.ceil(len(lines) / 10))
-        # plt.legend(handler_map=legend_obj)
+        for i in range(len(url)):
+            async with aiohttp.ClientSession() as session:
+                url_link = url[i]
+                async with session.get(url_link) as resp:
+                    if resp.status == 200:
+                        f = await aiofiles.open('emoji.png', mode='wb')
+                        await f.write(await resp.read())
+                        await f.close()
+                        img.append(HandlerLineImage('emoji.png'))
+        legend_obj = dict(zip(lines, img))
+
+        # plt.legend(handler_map=legend_obj, ncol=math.ceil(len(lines) / 10))
+        plt.legend(handler_map=legend_obj)
         plt.grid(True)
         plt.title("Time series of emote use in " + ctx.guild.name)
 
         fig = plt.gcf()
         fig.autofmt_xdate()
+        plt.xticks(ticks=dates)
         plt.show()
         plt.draw()
         fig.savefig('graph.png', bbox_inches='tight')
