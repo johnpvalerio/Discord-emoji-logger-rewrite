@@ -101,6 +101,8 @@ class Model(commands.Cog):
                                      if not emoji_server.managed),
                        emoji_found))
 
+            print('emojis found: ', emoji_found)
+
             # update emoji counts
             for emoji in set(emoji_found):
                 emoji_count = emoji_found.count(emoji)

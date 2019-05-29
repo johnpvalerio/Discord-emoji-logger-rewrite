@@ -59,10 +59,7 @@ class View(commands.Cog):
         url = []  # emoji URL
         lines = []  # graph lines
         img = []
-        temp = {}
-
-        counter = 0
-        LEGEND_COUNT = 10
+        temp_db = {}
 
         # dates: x
         # last 3 dates
@@ -70,51 +67,35 @@ class View(commands.Cog):
             dates.append(date)
         dates = dates[-4:-1]
 
+        print(dates)
+
         # emoji
         # todo: fix for large values
         # plot lines: dates & list_graph_emoji (inst_count)
 
-        # for id in self.model.db[ctx.guild.id][dates]:
-        #     for date in dates:
-        #         emoji_obj = self.model.db[ctx.guild.id][date][id]
-        #         list_graph_emoji.append(emoji_obj.instance_count)
-        #     if counter < LEGEND_COUNT:
-        #         line, = plt.plot(dates, list_graph_emoji, label=' - ' + emoji_obj.emoji_obj.name)
-        #     else:
-        #         line, = plt.plot(dates, list_graph_emoji)
-        #     lines.append(line)
-        #     url.append(str(emoji_obj.emoji_obj.url))
-        #     list_graph_emoji = []
-        #     counter += 1
-
-        # temp holds list of date & instance count keyed by emoji ID
+        # temp_db holds list of date & instance count keyed by emoji ID
         for date in dates:
+            print(date)
             for emoji_id in self.model.db[ctx.guild.id][date]:
                 # if emoji not yet processed
-                if emoji_id not in temp.keys():
-                    temp[emoji_id] = {'date': [], 'count': []}
-                # todo: if no data for that date, next
-                temp[emoji_id]['count'].append(self.model.db[ctx.guild.id][date][emoji_id].instance_count)
-                temp[emoji_id]['date'].append(date)
+                if emoji_id not in temp_db.keys():
+                    temp_db[emoji_id] = {'date': [], 'count': []}
+                print(emoji_id, ' - ', self.model.db[ctx.guild.id][date][emoji_id].instance_count)
 
-        # todo: create lines
-        print(temp)
-        for emoji, y in temp.items():
-            # print(y['date'], ' - ', y['count'])
-            line, = plt.plot(y['date'], y['count'], label=emoji, marker='>')
-            if not lines:
-                print('LINES')
-                print(y['date'])
-                for i in y['date']:
-                    print(i)
-                line, = plt.plot(y['date'], y['count'], label=emoji, marker='>')
-                print(y['date'])
-                print(y['count'])
-                lines.append(line)
-            else:
-                print('NO')
+                # if no entry of emoji on that date (newly added emojis)
+                if emoji_id not in self.model.db[ctx.guild.id][date]:
+                    print('\tSKIP')
+                    continue
 
+                temp_db[emoji_id]['count'].append(self.model.db[ctx.guild.id][date][emoji_id].instance_count)
+                temp_db[emoji_id]['date'].append(date)
+                url.append(str(self.model.db[ctx.guild.id][date][emoji_id].emoji_obj.url))
+            print()
+        print(temp_db)
 
+        for emoji, y in temp_db.items():
+            line, = plt.plot(y['date'], y['count'], marker='x', label=' - ' + ctx.bot.get_emoji(emoji).name)
+            lines.append(line)
 
         # adding images in the legend
         for i in range(len(url)):
@@ -129,13 +110,14 @@ class View(commands.Cog):
         legend_obj = dict(zip(lines, img))
 
         # plt.legend(handler_map=legend_obj, ncol=math.ceil(len(lines) / 10))
-        plt.legend(handler_map=legend_obj)
-        plt.grid(True)
-        plt.title("Time series of emote use in " + ctx.guild.name)
+        plt.legend(handler_map=legend_obj)  # legend
+
+        plt.grid(True)  # grid lines
+        plt.title("Time series of emote use in " + ctx.guild.name)  # title
 
         fig = plt.gcf()
-        fig.autofmt_xdate()
-        plt.xticks(ticks=dates)
+        fig.autofmt_xdate()  # might delete
+        plt.xticks(ticks=dates)  # display only given dates
         plt.show()
         plt.draw()
         fig.savefig('graph.png', bbox_inches='tight')
