@@ -60,7 +60,8 @@ class View(commands.Cog):
         lines = []  # graph lines
         img = []
         temp_db = {}
-
+        legend_countr = 0
+        MAX_LEGEND_COUNT = 10
         # dates: x
         # last 3 dates
         for date in self.model.db[ctx.guild.id]:
@@ -83,7 +84,7 @@ class View(commands.Cog):
                 print(emoji_id, ' - ', self.model.db[ctx.guild.id][date][emoji_id].instance_count)
 
                 # if no entry of emoji on that date (newly added emojis)
-                if emoji_id not in self.model.db[ctx.guild.id][date]:
+                if emoji_id not in self.model.db[ctx.guild.id][date] or self.model.db[ctx.guild.id][date][emoji_id].instance_count == 0:
                     print('\tSKIP')
                     continue
 
@@ -94,8 +95,12 @@ class View(commands.Cog):
         print(temp_db)
 
         for emoji, y in temp_db.items():
-            line, = plt.plot(y['date'], y['count'], marker='x', label=' - ' + ctx.bot.get_emoji(emoji).name)
+            if legend_countr < MAX_LEGEND_COUNT:
+                line, = plt.plot(y['date'], y['count'], marker='x', label=' - ' + ctx.bot.get_emoji(emoji).name)
+            else:
+                line, = plt.plot(y['date'], y['count'], marker='x')
             lines.append(line)
+            legend_countr +=1
 
         # adding images in the legend
         for i in range(len(url)):
@@ -109,6 +114,7 @@ class View(commands.Cog):
                         img.append(HandlerLineImage('emoji.png'))
         legend_obj = dict(zip(lines, img))
 
+        # makes columns of size 10
         # plt.legend(handler_map=legend_obj, ncol=math.ceil(len(lines) / 10))
         plt.legend(handler_map=legend_obj)  # legend
 

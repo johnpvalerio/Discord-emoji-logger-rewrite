@@ -27,7 +27,7 @@ class Model(commands.Cog):
         # add new guilds
         for guild in self.bot.guilds:
             # new database or new guild
-            if self.db == {} or not self.db[guild.id]:
+            if self.db == {} or guild.id not in self.db:
                 self.db[guild.id] = {}
                 await self.prepare_db(guild.id)
 
@@ -39,6 +39,7 @@ class Model(commands.Cog):
         print(self.db)
         print('Ready')
 
+    # note: emoji dates added isnt reflected in data logged
     async def prepare_db(self, guild_ID, start_date=None):
         """
         Sets database db to contain date & server emojis
@@ -106,17 +107,34 @@ class Model(commands.Cog):
             # update emoji counts
             for emoji in set(emoji_found):
                 emoji_count = emoji_found.count(emoji)
-                self.update_data(channel_id=channel.guild.id, date_index=date_index, date_list=date_list,
+                self.update_data(guild_id=channel.guild.id, date_index=date_index, date_list=date_list,
                                  emoji_ID=int(emoji[-19:-1]), inst_inc=1, total_inc=emoji_count)
 
     # update stats for given emoji in upcoming dates
-    def update_data(self, channel_id, date_index, date_list, emoji_ID, inst_inc, total_inc):
+    def update_data(self, guild_id, date_index, date_list, emoji_ID, inst_inc, total_inc):
         next_dates = []
         for i in range(date_index, len(date_list)):
             next_dates.append(date_list[i])
         for date in next_dates:
-            self.db[channel_id][date][emoji_ID].instance_count += inst_inc
-            self.db[channel_id][date][emoji_ID].total_count += total_inc
+            self.db[guild_id][date][emoji_ID].instance_count += inst_inc
+            self.db[guild_id][date][emoji_ID].total_count += total_inc
+
+    def merge_entry(self, guild_id, date1, date2):
+        '''
+        Merge data entry from dates for given guild, data1 = data1 + data2
+        @param date1: datetime target
+        @param date2: datetime source
+        @return: None
+        '''
+
+        for emoji_id in self.db[guild_id][date1]:
+            print(emoji_id)
+            try:
+                self.db[guild_id][date1][emoji_id].instance_count += self.db[guild_id][date2][emoji_id].instance_count
+                print(self.db[guild_id][date1][emoji_id].instance_count, ' - ', self.db[guild_id][date2][emoji_id].instance_count)
+                self.db[guild_id][date1][emoji_id].total_count += self.db[guild_id][date2][emoji_id].total_count
+            except KeyError:
+                print('no entry for emoji')
 
     async def next_dates(self, start_date):
         """

@@ -20,7 +20,8 @@ class Controller(commands.Cog):
         await self.view.print(ctx, str_output)
 
     @commands.command()
-    @commands.has_permissions(administrator=True)
+    # @commands.has_permissions(administrator=True)
+    @commands.has_permissions(manage_guild=True)
     async def log(self, ctx, *args):
         print("\n--------------------------")
         print('[COMMAND] - log()')
@@ -29,9 +30,11 @@ class Controller(commands.Cog):
         # log from last compiled
         if args == ():
             args = ''
-            cur_date = list(self.model.db[ctx.guild.id])[-1]
-            print('FROM LAST', cur_date)
-            await self.model.prepare_db(ctx.guild.id, cur_date)
+            last_date = list(self.model.db[ctx.guild.id])[-1]
+            copy_date = list(self.model.db[ctx.guild.id])[-2]
+            print(copy_date)
+            print('FROM LAST', last_date)
+            await self.model.prepare_db(ctx.guild.id, last_date)
         # log from the start
         else:
             args = 'n'
@@ -42,9 +45,12 @@ class Controller(commands.Cog):
                 await self.model.log_channel(current_channel)
             else:
                 # log from last saved
-                await self.model.log_channel(current_channel, cur_date)
-                print('continue')
-        # todo: if continue, add missing data from last iteration
+                await self.model.log_channel(current_channel, last_date)
+        # todo: if continue, add missing data from last iteration, get ALL dates from last date to now
+        if args == '':
+            last_date = list(self.model.db[ctx.guild.id])[-1]
+            copy_date = list(self.model.db[ctx.guild.id])[-2]
+            self.model.merge_entry(ctx.guild.id, last_date, copy_date)
         await self.view.db(ctx)
 
     @commands.command()
