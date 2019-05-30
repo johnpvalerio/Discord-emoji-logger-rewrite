@@ -31,7 +31,7 @@ class View(commands.Cog):
             print(date)
         await ctx.send('complete')
 
-    # todo: overlap problems & ordering (sort)
+    # todo: overlap problems
     async def pie(self, ctx):
         """
         Create and display a pie chart of latest emoji stats
@@ -40,10 +40,21 @@ class View(commands.Cog):
         """
         labels = []
         values = []
-        latest_date = list(self.model.db[ctx.guild.id])[-1]
-        for emoji in self.model.db[ctx.guild.id][latest_date]:
-            labels.append(self.model.db[ctx.guild.id][latest_date][emoji].emoji_obj.name)
-            values.append(self.model.db[ctx.guild.id][latest_date][emoji].instance_count)
+        dict_emojis = {}
+        last_date = list(self.model.db[ctx.guild.id])[-1]
+
+        # copy content
+        for x, y in self.model.db[ctx.guild.id][last_date].items():
+            dict_emojis[x] = y
+        # sort by instance count into list: (id, EmojiStat)
+        sorted_emojis = sorted(dict_emojis.items(),
+                               key=lambda kv: getattr(kv[1], 'instance_count'),
+                               reverse=True)
+
+        for emoji in sorted_emojis:
+            labels.append(emoji[1].emoji_obj.name)
+            values.append(emoji[1].instance_count)
+
         fig, ax = plt.subplots()
         ax.pie(values, labels=labels, autopct='%1.1f%%')
         ax.axis('equal')
@@ -61,14 +72,18 @@ class View(commands.Cog):
         # copy content
         for x, y in self.model.db[ctx.guild.id][last_date].items():
             dict_emojis[x] = y
-        # sort by instance count into list
+        # sort by instance count into list: (id, EmojiStat)
         sorted_emojis = sorted(dict_emojis.items(),
                                key=lambda kv: getattr(kv[1], 'instance_count'),
                                reverse=True)
         # create output string
-        for x in sorted_emojis:
-            print(x[0], ' - ', x[1].instance_count)
-            str_output += self.model.db[ctx.guild.id][last_date][x[0]].emoji_obj.name + ' - ' + str(x[1].instance_count) + '\n'
+        # emoji: (id, EmojiStat)
+        for emoji in sorted_emojis:
+            print(emoji[0], ' - ', emoji[1].instance_count)
+            emoji_id = emoji[1].emoji_obj.id
+            str_output += str(ctx.bot.get_emoji(emoji_id)) + \
+                        ' - ' + str(emoji[1].instance_count) + \
+                        '\n'
 
         await self.print(ctx, str_output)
 
@@ -119,7 +134,8 @@ class View(commands.Cog):
 
         for emoji, db_content in temp_db.items():
             if legend_countr < MAX_LEGEND_COUNT:
-                line, = plt.plot(db_content['date'], db_content['count'], marker='.', label=' - ' + ctx.bot.get_emoji(emoji).name)
+                line, = plt.plot(db_content['date'], db_content['count'], marker='.',
+                                 label=' - ' + ctx.bot.get_emoji(emoji).name)
             else:
                 line, = plt.plot(db_content['date'], db_content['count'], marker='.')
             lines.append(line)
