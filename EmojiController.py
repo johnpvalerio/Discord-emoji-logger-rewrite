@@ -71,3 +71,7 @@ class Controller(commands.Cog):
     @commands.command('pie')
     async def pie(self, ctx):
         await self.view.pie(ctx)
+
+    @commands.command()
+    async def table(self, ctx):
+        await self.view.table(ctx)

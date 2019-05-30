@@ -1,8 +1,7 @@
-# import copy
+import copy
 
 import aiofiles as aiofiles
 import aiohttp
-import math
 from discord.ext import commands
 import matplotlib.pyplot as plt
 import matplotlib.lines
@@ -32,8 +31,13 @@ class View(commands.Cog):
             print(date)
         await ctx.send('complete')
 
-    # todo: overlap problems
+    # todo: overlap problems & ordering (sort)
     async def pie(self, ctx):
+        """
+        Create and display a pie chart of latest emoji stats
+        @param ctx: discord context
+        @return: None
+        """
         labels = []
         values = []
         latest_date = list(self.model.db[ctx.guild.id])[-1]
@@ -49,24 +53,42 @@ class View(commands.Cog):
         fig.savefig('pie.png')
         await ctx.send(file=discord.File('pie.png'))
 
+    async def table(self, ctx):
+        dict_emojis = {}
+        str_output = ''
+        last_date = list(self.model.db[ctx.guild.id])[-1]
+
+        # copy content
+        for x, y in self.model.db[ctx.guild.id][last_date].items():
+            dict_emojis[x] = y
+        # sort by instance count into list
+        sorted_emojis = sorted(dict_emojis.items(),
+                               key=lambda kv: getattr(kv[1], 'instance_count'),
+                               reverse=True)
+        # create output string
+        for x in sorted_emojis:
+            print(x[0], ' - ', x[1].instance_count)
+            str_output += self.model.db[ctx.guild.id][last_date][x[0]].emoji_obj.name + ' - ' + str(x[1].instance_count) + '\n'
+
+        await self.print(ctx, str_output)
+
     # todo: legend ordering
     # note: matplotlib creates x axis if not enough/too little distance from start/end
-    # do last 3 months graph data
     # ignore 0's (twitch emotes)
     async def graph(self, ctx):
         dates = []  # dates
-        list_graph_emoji = []  # emoji object (line)
         url = []  # emoji URL
         lines = []  # graph lines
         img = []
         temp_db = {}
         legend_countr = 0
         MAX_LEGEND_COUNT = 10
-        # dates: x
+        MAX_DATES = 5
+
         # last 3 dates
         for date in self.model.db[ctx.guild.id]:
             dates.append(date)
-        dates = dates[-4:-1]
+        dates = dates[-(MAX_DATES + 1):-1]
 
         print(dates)
 
@@ -84,9 +106,10 @@ class View(commands.Cog):
                 print(emoji_id, ' - ', self.model.db[ctx.guild.id][date][emoji_id].instance_count)
 
                 # if no entry of emoji on that date (newly added emojis)
-                if emoji_id not in self.model.db[ctx.guild.id][date] or self.model.db[ctx.guild.id][date][emoji_id].instance_count == 0:
-                    print('\tSKIP')
-                    continue
+                # todo: skipping makes url order incorrect
+                # if emoji_id not in self.model.db[ctx.guild.id][date] or self.model.db[ctx.guild.id][date][emoji_id].instance_count == 0:
+                #     print('\tSKIP')
+                #     continue
 
                 temp_db[emoji_id]['count'].append(self.model.db[ctx.guild.id][date][emoji_id].instance_count)
                 temp_db[emoji_id]['date'].append(date)
@@ -94,13 +117,13 @@ class View(commands.Cog):
             print()
         print(temp_db)
 
-        for emoji, y in temp_db.items():
+        for emoji, db_content in temp_db.items():
             if legend_countr < MAX_LEGEND_COUNT:
-                line, = plt.plot(y['date'], y['count'], marker='x', label=' - ' + ctx.bot.get_emoji(emoji).name)
+                line, = plt.plot(db_content['date'], db_content['count'], marker='.', label=' - ' + ctx.bot.get_emoji(emoji).name)
             else:
-                line, = plt.plot(y['date'], y['count'], marker='x')
+                line, = plt.plot(db_content['date'], db_content['count'], marker='.')
             lines.append(line)
-            legend_countr +=1
+            legend_countr += 1
 
         # adding images in the legend
         for i in range(len(url)):
