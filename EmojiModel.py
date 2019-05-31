@@ -18,6 +18,10 @@ class Model(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
+        """
+        sets up database on initialization
+        @return: None
+        """
         cred = credentials.Certificate('firebase_admin.json')
         firebase_admin.initialize_app(cred, {
             'databaseURL': 'https://discord-emoji-stat.firebaseio.com/'})
@@ -28,16 +32,19 @@ class Model(commands.Cog):
         for guild in self.bot.guilds:
             # new database or new guild
             if self.db == {} or guild.id not in self.db:
-                self.db[guild.id] = {}
-                await self.prepare_db(guild.id)
-
-        # if empty
-        # if self.db == {}:
-        #     for guild in self.bot.guilds:
-        #         self.db[guild.id] = {}
-        #         await self.prepare_db(guild.id)
+                await self.new_db()
         print(self.db)
         print('Ready')
+
+    async def new_db(self, guild_id):
+        """
+        creates new guild entry in database
+        @param guild_id: int guild ID
+        @return: None
+        """
+        self.db[guild_id].clear()
+        self.db[guild_id] = {}
+        await self.prepare_db(guild_id)
 
     # note: emoji dates added isnt reflected in data logged
     async def prepare_db(self, guild_ID, start_date=None):
@@ -47,37 +54,49 @@ class Model(commands.Cog):
         @param start_date: starting date to initialize datetime
         @return: None
         """
-
         # start from beginning
         if start_date is None:
             date_list = await self.next_dates(self.bot.get_guild(guild_ID).created_at)
         # start from date given
         else:
             date_list = await self.next_dates(start_date)
-            # ignore first entry (last processed date)
-            date_list = date_list[1:]
         # add emojis
-        dict_emojis = await self.compile_emoji(guild_ID)
         for date in date_list:
-            print(dict_emojis)
-            self.db[guild_ID][date] = dict_emojis
+            self.db[guild_ID][date] = await self.compile_emoji(guild_ID)
 
     async def log_channel(self, channel, start_date=None):
+        """
+        Main channel logging driver, sets up dates to use
+        @param channel: Discordpy channel target channel
+        @param start_date: datetime start date
+        @return: None
+        """
         date_list = []
+        # default, start date from channel creation
         if start_date is None:
             start_date = channel.created_at
+        # make list of dates
         for date in self.db[channel.guild.id]:
             date_list.append(date)
-        await self.log_emoji(channel, start_date, datetime.datetime.now(), date_list)
         print(channel)
+        # log emoji for channel
+        await self.log_emoji(channel, start_date, datetime.datetime.now(), date_list)
 
     # todo: total_count is weird sometimes
     # compile emoji in all channels between given dates
     async def log_emoji(self, channel, date_after, date_stop, date_list):
+        """
+        Compile emojis in given channel between given dates
+        @param channel: Discordpy channel target channel
+        @param date_after: datetime date target after date
+        @param date_stop: datetime date target stop date
+        @param date_list: datetime list of dates to go through
+        @return: None
+        """
         date_index = 0
         date_max_index = len(date_list) - 1
+        # go through channel history
         async for message in channel.history(limit=None, before=date_stop, after=date_after):
-
             # move date to next closest
             while message.created_at >= date_list[date_index]:
                 date_index = date_index + 1
@@ -107,32 +126,37 @@ class Model(commands.Cog):
             # update emoji counts
             for emoji in set(emoji_found):
                 emoji_count = emoji_found.count(emoji)
-                self.update_data(guild_id=channel.guild.id, date_index=date_index, date_list=date_list,
+                self.update_data(guild_id=channel.guild.id,date_list=date_list[date_index:],
                                  emoji_ID=int(emoji[-19:-1]), inst_inc=1, total_inc=emoji_count)
 
-    # update stats for given emoji in upcoming dates
-    def update_data(self, guild_id, date_index, date_list, emoji_ID, inst_inc, total_inc):
-        next_dates = []
-        for i in range(date_index, len(date_list)):
-            next_dates.append(date_list[i])
-        for date in next_dates:
+    def update_data(self, guild_id, date_list, emoji_ID, inst_inc, total_inc):
+        """
+        update stats for given emoji in upcoming dates
+        @param guild_id: int guild ID
+        @param date_list: datetime list of all datetime to go through
+        @param emoji_ID: int emoji ID
+        @param inst_inc: int instance count increase (default 1)
+        @param total_inc: int total count increase
+        @return: None
+        """
+        for date in date_list:
             self.db[guild_id][date][emoji_ID].instance_count += inst_inc
             self.db[guild_id][date][emoji_ID].total_count += total_inc
 
     def merge_entry(self, guild_id, date1, date2):
-        '''
+        """
         Merge data entry from dates for given guild, data1 = data1 + data2
+        @param guild_id: int guild id
         @param date1: datetime target
         @param date2: datetime source
         @return: None
-        '''
-
+        """
         for emoji_id in self.db[guild_id][date1]:
             print(emoji_id)
             try:
                 self.db[guild_id][date1][emoji_id].instance_count += self.db[guild_id][date2][emoji_id].instance_count
-                print(self.db[guild_id][date1][emoji_id].instance_count, ' - ', self.db[guild_id][date2][emoji_id].instance_count)
                 self.db[guild_id][date1][emoji_id].total_count += self.db[guild_id][date2][emoji_id].total_count
+                print(self.db[guild_id][date1][emoji_id].instance_count, ' + ', self.db[guild_id][date2][emoji_id].instance_count)
             except KeyError:
                 print('no entry for emoji')
 
@@ -148,9 +172,15 @@ class Model(commands.Cog):
         while start_date < datetime.datetime.now():
             start_date = self.format_date(start_date)
             date_list.append(start_date)
+
         return date_list
 
     def format_date(self, date):
+        """
+        Format date as first of every month
+        @param date: datetime target date
+        @return: datetime formatted
+        """
         if date.month == 12:
             return date.replace(year=date.year + 1, month=1)
         else:
@@ -158,7 +188,7 @@ class Model(commands.Cog):
 
     async def compile_emoji(self, guild_ID):
         """
-        Creates dictionary of emoji ID and emojitStat object
+        Creates dictionary of emoji ID and emojiStat object
         @param guild_ID: guild ID integer
         @return: emoji_dict[emoji ID] = EmojiStat (object)
         """
@@ -170,6 +200,7 @@ class Model(commands.Cog):
             emoji_dict[current_emoji.id] = EmojiStat.EmojiStat(current_emoji)
         return emoji_dict
 
+    # todo: export to firebase database
     def export(self):
         print('Saving JSON file...')
         temp_db = {}
