@@ -79,13 +79,32 @@ class View(commands.Cog):
         # create output string
         # emoji: (id, EmojiStat)
         for emoji in sorted_emojis:
-            print(emoji[0], ' - ', emoji[1].instance_count)
+            # print(emoji[0], ' - ', emoji[1].instance_count)
             emoji_id = emoji[1].emoji_obj.id
             str_output += str(ctx.bot.get_emoji(emoji_id)) + \
-                        ' - ' + str(emoji[1].instance_count) + \
-                        '\n'
+                          ' - ' + str(emoji[1].instance_count) + \
+                          '\n'
 
-        await self.print(ctx, str_output)
+        # await self.print(ctx, str_output)
+        await self.embed(ctx, sorted_emojis)
+
+    async def embed(self, ctx, msg):
+        if type(msg) is list:
+            print('ey')
+            output = ''
+            embed = discord.Embed(title=ctx.guild.name + '\'s emoji stats')
+            for i in range(len(msg)):
+                print(msg[i])
+                output += str(msg[i][1].emoji_obj) + ' - ' + str(msg[i][1].instance_count) + '\n'
+
+                if i % 5 == 4:
+                    embed.add_field(name=str(i - 3) + ' - ' + str(i + 1), value=output, inline=True)
+                    output = ''
+            embed.add_field(name=str(len(msg) - (len(msg) % 5) +1) + ' - ' + str(len(msg)), value=output)
+        else:
+            embed = discord.Embed(title='Untitled')
+            embed.add_field(name='Field 1', value=msg)
+        await ctx.send(embed=embed)
 
     # todo: legend ordering
     # note: matplotlib creates x axis if not enough/too little distance from start/end
