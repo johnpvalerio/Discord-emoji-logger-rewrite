@@ -32,7 +32,7 @@ class Model(commands.Cog):
         for guild in self.bot.guilds:
             # new database or new guild
             if self.db == {} or guild.id not in self.db:
-                await self.new_db()
+                await self.new_db(guild.id)
         print(self.db)
         print('Ready')
 
@@ -42,7 +42,7 @@ class Model(commands.Cog):
         @param guild_id: int guild ID
         @return: None
         """
-        self.db[guild_id].clear()
+        # self.db[guild_id].clear()
         self.db[guild_id] = {}
         await self.prepare_db(guild_id)
 
@@ -126,7 +126,7 @@ class Model(commands.Cog):
             # update emoji counts
             for emoji in set(emoji_found):
                 emoji_count = emoji_found.count(emoji)
-                self.update_data(guild_id=channel.guild.id,date_list=date_list[date_index:],
+                self.update_data(guild_id=channel.guild.id, date_list=date_list[date_index:],
                                  emoji_ID=int(emoji[-19:-1]), inst_inc=1, total_inc=emoji_count)
 
     def update_data(self, guild_id, date_list, emoji_ID, inst_inc, total_inc):
@@ -156,7 +156,8 @@ class Model(commands.Cog):
             try:
                 self.db[guild_id][date1][emoji_id].instance_count += self.db[guild_id][date2][emoji_id].instance_count
                 self.db[guild_id][date1][emoji_id].total_count += self.db[guild_id][date2][emoji_id].total_count
-                print(self.db[guild_id][date1][emoji_id].instance_count, ' + ', self.db[guild_id][date2][emoji_id].instance_count)
+                print(self.db[guild_id][date1][emoji_id].instance_count, ' + ',
+                      self.db[guild_id][date2][emoji_id].instance_count)
             except KeyError:
                 print('no entry for emoji')
 
@@ -193,7 +194,9 @@ class Model(commands.Cog):
         @return: emoji_dict[emoji ID] = EmojiStat (object)
         """
         # emojis for current guild ID
-        emojis = self.bot.get_guild(guild_ID).emojis
+        emojis = [x for x in self.bot.get_guild(guild_ID).emojis if x.managed is False]
+        # emojis = self.bot.get_guild(guild_ID).emojis
+
         emoji_dict = {}
         # Add into dictionary newly created EmojiStat object
         for current_emoji in emojis:

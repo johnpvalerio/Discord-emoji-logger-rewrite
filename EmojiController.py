@@ -100,8 +100,15 @@ class Controller(commands.Cog):
     @commands.command('emb')
     async def embed(self, ctx, *args):
         print("\n--------------------------")
-        print('[COMMAND] - table()')
+        print('[COMMAND] - embed()')
         print("--------------------------")
         msg = ' '.join(args)
         print(msg)
         await self.view.embed(ctx, msg)
+
+    @commands.command()
+    async def bar(self, ctx):
+        print("\n--------------------------")
+        print('[COMMAND] - bar()')
+        print("--------------------------")
+        await self.view.bar(ctx)

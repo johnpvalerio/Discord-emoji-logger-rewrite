@@ -1,5 +1,3 @@
-import copy
-
 import aiofiles as aiofiles
 import aiohttp
 from discord.ext import commands
@@ -40,16 +38,9 @@ class View(commands.Cog):
         """
         labels = []
         values = []
-        dict_emojis = {}
-        last_date = list(self.model.db[ctx.guild.id])[-1]
 
-        # copy content
-        for x, y in self.model.db[ctx.guild.id][last_date].items():
-            dict_emojis[x] = y
         # sort by instance count into list: (id, EmojiStat)
-        sorted_emojis = sorted(dict_emojis.items(),
-                               key=lambda kv: getattr(kv[1], 'instance_count'),
-                               reverse=True)
+        sorted_emojis = self.sort(ctx, 'instance')
 
         for emoji in sorted_emojis:
             labels.append(emoji[1].emoji_obj.name)
@@ -65,17 +56,10 @@ class View(commands.Cog):
         await ctx.send(file=discord.File('pie.png'))
 
     async def table(self, ctx):
-        dict_emojis = {}
         str_output = ''
-        last_date = list(self.model.db[ctx.guild.id])[-1]
 
-        # copy content
-        for x, y in self.model.db[ctx.guild.id][last_date].items():
-            dict_emojis[x] = y
         # sort by instance count into list: (id, EmojiStat)
-        sorted_emojis = sorted(dict_emojis.items(),
-                               key=lambda kv: getattr(kv[1], 'instance_count'),
-                               reverse=True)
+        sorted_emojis = self.sort(ctx, 'instance')
         # create output string
         # emoji: (id, EmojiStat)
         for emoji in sorted_emojis:
@@ -88,6 +72,7 @@ class View(commands.Cog):
         # await self.print(ctx, str_output)
         await self.embed(ctx, sorted_emojis)
 
+    # todo: more info like % increase, date, etc
     async def embed(self, ctx, msg):
         if type(msg) is list:
             print('ey')
@@ -100,11 +85,67 @@ class View(commands.Cog):
                 if i % 5 == 4:
                     embed.add_field(name=str(i - 3) + ' - ' + str(i + 1), value=output, inline=True)
                     output = ''
-            embed.add_field(name=str(len(msg) - (len(msg) % 5) +1) + ' - ' + str(len(msg)), value=output)
+            embed.add_field(name=str(len(msg) - (len(msg) % 5) + 1) + ' - ' + str(len(msg)), value=output)
         else:
             embed = discord.Embed(title='Untitled')
             embed.add_field(name='Field 1', value=msg)
         await ctx.send(embed=embed)
+
+    # todo: sort by alphabetical order
+    async def bar(self, ctx):
+        list_names = []
+        list_vals = []
+        width = 0.3
+        y_max = 100
+        last_date = list(self.model.db[ctx.guild.id])[-1]
+        emote_size = len(self.model.db[ctx.guild.id][last_date])
+        ind = [x for x in range(emote_size)]
+
+        if emote_size >= 70:
+            text_size = 5
+        elif emote_size >= 50:
+            text_size = 6
+        elif emote_size >= 30:
+            text_size = 8
+        else:
+            text_size = 12
+
+        for emoji_id, emoji in self.model.db[ctx.guild.id][last_date].items():
+            print(emoji)
+            list_names.append(emoji.emoji_obj.name)
+            list_vals.append(emoji.instance_count)
+            if y_max < emoji.instance_count:
+                y_max = emoji.instance_count
+
+        plt.ylim([0, y_max])
+        plt.bar(ind, list_vals, width)
+        plt.xticks(ind, list_names, fontsize=text_size, rotation=90)
+        plt.xlabel('Emoji')
+        plt.ylabel('Single instance count')
+        plt.title("Bar graph of emote use in " + ctx.guild.name)  # title
+        fig = plt.gcf()
+        plt.show()
+        plt.draw()
+        fig.savefig('graph.png', bbox_inches='tight')
+        await ctx.send(file=discord.File('graph.png'))
+
+    def bottom_calc(self, list_items):
+        """
+        Helper for bar graph creation, sets bottom attribute for bar stacking
+        @param list_items: list of items to process
+        @return: 0 default - list of ints matrix add
+        """
+        output = None
+        # default: x axis floor
+        if len(list_items) == 0:
+            return 0
+        # else: add all previous entries
+        for x in list_items:
+            if output is None:
+                output = x
+            else:
+                output = [sum(y) for y in zip(output, x)]
+        return output
 
     # todo: legend ordering
     # note: matplotlib creates x axis if not enough/too little distance from start/end
@@ -178,14 +219,50 @@ class View(commands.Cog):
 
         plt.grid(True)  # grid lines
         plt.title("Time series of emote use in " + ctx.guild.name)  # title
+        plt.xticks(ticks=dates)  # display only given dates
 
         fig = plt.gcf()
         fig.autofmt_xdate()  # might delete
-        plt.xticks(ticks=dates)  # display only given dates
         plt.show()
         plt.draw()
         fig.savefig('graph.png', bbox_inches='tight')
         await ctx.send(file=discord.File('graph.png'))
+
+    def sort(self, ctx, sort_type):
+        """
+        Creates a sorted copy of the data of the latest date as a list
+        @param ctx: Discord context
+        @param sort_type: string sorting type: 'instance', 'total', 'alpha'
+        @return: list (id, EmojiStat)
+        """
+        # sort by instance_count descending order
+        if sort_type == 'instance':
+            last_date = list(self.model.db[ctx.guild.id])[-1]
+            dict_emojis = {}
+
+            for x, y in self.model.db[ctx.guild.id][last_date].items():
+                dict_emojis[x] = y
+            # sort by instance count into list: (id, EmojiStat)
+            sorted_emojis = sorted(dict_emojis.items(),
+                                   key=lambda kv: getattr(kv[1], 'instance_count'),
+                                   reverse=True)
+            return sorted_emojis
+        # sort by total_count descending order
+        elif sort_type == 'total':
+            last_date = list(self.model.db[ctx.guild.id])[-1]
+            dict_emojis = {}
+
+            for x, y in self.model.db[ctx.guild.id][last_date].items():
+                dict_emojis[x] = y
+            # sort by instance count into list: (id, EmojiStat)
+            sorted_emojis = sorted(dict_emojis.items(),
+                                   key=lambda kv: getattr(kv[1], 'total_count'),
+                                   reverse=True)
+            return sorted_emojis
+        # todo: create alphabetical sort
+        # sort by emoji's name alphabetical order
+        elif sort_type == 'alpha':
+            pass
 
 
 class HandlerLineImage(HandlerBase):
