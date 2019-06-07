@@ -1,12 +1,13 @@
+import datetime
 import json
 import re
 
-from discord.ext import commands
-import EmojiStat
-import datetime
 import firebase_admin
+from discord.ext import commands
 from firebase_admin import credentials
 from firebase_admin import db
+
+import EmojiStat
 
 
 class Model(commands.Cog):
@@ -121,7 +122,7 @@ class Model(commands.Cog):
                                      if not emoji_server.managed),
                        emoji_found))
 
-            print('emojis found: ', emoji_found)
+            print('emojis found: ', emoji_found, ' - date: ', date_list[date_index:])
 
             # update emoji counts
             for emoji in set(emoji_found):
@@ -174,7 +175,8 @@ class Model(commands.Cog):
             start_date = self.format_date(start_date)
             date_list.append(start_date)
 
-        return date_list
+        print(date_list[:-1])
+        return date_list[:-1]
 
     def format_date(self, date):
         """

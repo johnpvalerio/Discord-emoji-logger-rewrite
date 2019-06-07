@@ -59,12 +59,13 @@ class Controller(commands.Cog):
         await self.view.db(ctx)
 
     @commands.command()
-    async def re(self, ctx, args):
+    async def re(self, ctx, *args):
         print("\n--------------------------")
         print('[COMMAND] - re()')
         print("--------------------------")
         print(args)
-        await self.view.print(ctx, args)
+        msg = ' '.join(args)
+        await self.view.print(ctx, msg)
 
     @commands.command('exp')
     @commands.has_permissions(administrator=True)

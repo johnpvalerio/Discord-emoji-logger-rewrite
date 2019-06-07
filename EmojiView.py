@@ -1,12 +1,12 @@
 import aiofiles as aiofiles
 import aiohttp
-from discord.ext import commands
-import matplotlib.pyplot as plt
-import matplotlib.lines
-from matplotlib.transforms import Bbox, TransformedBbox
-from matplotlib.legend_handler import HandlerBase
-from matplotlib.image import BboxImage
 import discord
+import matplotlib.lines
+import matplotlib.pyplot as plt
+from discord.ext import commands
+from matplotlib.image import BboxImage
+from matplotlib.legend_handler import HandlerBase
+from matplotlib.transforms import Bbox, TransformedBbox
 
 
 class View(commands.Cog):
@@ -23,10 +23,10 @@ class View(commands.Cog):
         print(self.model.db)
 
         for date, val2 in self.model.db[ctx.guild.id].items():
+            print(date)
             for emoji_ID, emoji_obj in self.model.db[ctx.guild.id][date].items():
                 print('\t', emoji_obj.emoji_obj.name, ': ', emoji_obj.instance_count, ' - ', emoji_obj.total_count)
             print('\t\t - - - -')
-            print(date)
         await ctx.send('complete')
 
     # todo: overlap problems
@@ -55,21 +55,21 @@ class View(commands.Cog):
         fig.savefig('pie.png')
         await ctx.send(file=discord.File('pie.png'))
 
+    # todo: fix if msg too long (many emotes)
     async def table(self, ctx):
         str_output = ''
 
         # sort by instance count into list: (id, EmojiStat)
         sorted_emojis = self.sort(ctx, 'instance')
+
         # create output string
         # emoji: (id, EmojiStat)
         for emoji in sorted_emojis:
-            # print(emoji[0], ' - ', emoji[1].instance_count)
             emoji_id = emoji[1].emoji_obj.id
             str_output += str(ctx.bot.get_emoji(emoji_id)) + \
                           ' - ' + str(emoji[1].instance_count) + \
                           '\n'
 
-        # await self.print(ctx, str_output)
         await self.embed(ctx, sorted_emojis)
 
     # todo: more info like % increase, date, etc
@@ -80,27 +80,48 @@ class View(commands.Cog):
             embed = discord.Embed(title=ctx.guild.name + '\'s emoji stats')
             for i in range(len(msg)):
                 print(msg[i])
-                output += str(msg[i][1].emoji_obj) + ' - ' + str(msg[i][1].instance_count) + '\n'
+                emoji = msg[i][1]
+                emoji_id = msg[i][0]
+                last_date = list(self.model.db[ctx.guild.id])[-1]
+                prior_date = list(self.model.db[ctx.guild.id])[-2]
+                print(last_date)
+                print(self.model.db[ctx.guild.id][last_date][emoji_id].instance_count)
+                print(prior_date)
+                print(self.model.db[ctx.guild.id][prior_date][emoji_id].instance_count)
+                increase = emoji.instance_count - self.model.db[ctx.guild.id][prior_date][emoji_id].instance_count
+
+                print(increase)
+
+                output += str(emoji.emoji_obj) + ' : ' + \
+                          str(emoji.instance_count) + ' [ ' + \
+                          str(increase) + '↑]\n'
+
 
                 if i % 5 == 4:
-                    embed.add_field(name=str(i - 3) + ' - ' + str(i + 1), value=output, inline=True)
+                    print(output)
+                    embed.add_field(name=str(i - 3) + ' - ' + str(i + 1), value=output, inline=False)
                     output = ''
-            embed.add_field(name=str(len(msg) - (len(msg) % 5) + 1) + ' - ' + str(len(msg)), value=output)
+            print(output)
+            if output is not '':
+                embed.add_field(name=str(len(msg) - (len(msg) % 5) + 1) + ' - ' + str(len(msg)), value=output,
+                                inline=False)
         else:
             embed = discord.Embed(title='Untitled')
             embed.add_field(name='Field 1', value=msg)
         await ctx.send(embed=embed)
 
     # todo: sort by alphabetical order
-    async def bar(self, ctx):
-        list_names = []
-        list_vals = []
-        width = 0.3
-        y_max = 100
-        last_date = list(self.model.db[ctx.guild.id])[-1]
-        emote_size = len(self.model.db[ctx.guild.id][last_date])
-        ind = [x for x in range(emote_size)]
+    async def bar(self, ctx, type='instance'):
+        list_names = []  # x tick labels
+        list_vals = []  # y values
+        width = 0.3  # bar width size
+        y_max = 100  # y delimiter
 
+        last_date = list(self.model.db[ctx.guild.id])[-1]  # latest date
+        emote_size = len(self.model.db[ctx.guild.id][last_date])  # number of emojis
+        ind = [x for x in range(emote_size)]  # list of ints to space graph
+
+        # set emote font size
         if emote_size >= 70:
             text_size = 5
         elif emote_size >= 50:
@@ -110,12 +131,14 @@ class View(commands.Cog):
         else:
             text_size = 12
 
-        for emoji_id, emoji in self.model.db[ctx.guild.id][last_date].items():
-            print(emoji)
-            list_names.append(emoji.emoji_obj.name)
-            list_vals.append(emoji.instance_count)
-            if y_max < emoji.instance_count:
-                y_max = emoji.instance_count
+        sorted_emojis = self.sort(ctx, type)
+
+        # for emoji_id, emoji in self.model.db[ctx.guild.id][last_date].items():
+        for emoji in sorted_emojis:
+            list_names.append(emoji[1].emoji_obj.name)
+            list_vals.append(emoji[1].instance_count)
+            if y_max < emoji[1].instance_count:
+                y_max = emoji[1].instance_count
 
         plt.ylim([0, y_max])
         plt.bar(ind, list_vals, width)
@@ -163,7 +186,7 @@ class View(commands.Cog):
         # last 3 dates
         for date in self.model.db[ctx.guild.id]:
             dates.append(date)
-        dates = dates[-(MAX_DATES + 1):-1]
+        dates = dates[-MAX_DATES:]
 
         print(dates)
 
