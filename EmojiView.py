@@ -75,36 +75,27 @@ class View(commands.Cog):
     # todo: more info like % increase, date, etc
     async def embed(self, ctx, msg):
         if type(msg) is list:
-            print('ey')
             output = ''
             embed = discord.Embed(title=ctx.guild.name + '\'s emoji stats')
             for i in range(len(msg)):
-                print(msg[i])
                 emoji = msg[i][1]
                 emoji_id = msg[i][0]
                 last_date = list(self.model.db[ctx.guild.id])[-1]
                 prior_date = list(self.model.db[ctx.guild.id])[-2]
-                print(last_date)
-                print(self.model.db[ctx.guild.id][last_date][emoji_id].instance_count)
-                print(prior_date)
-                print(self.model.db[ctx.guild.id][prior_date][emoji_id].instance_count)
-                increase = emoji.instance_count - self.model.db[ctx.guild.id][prior_date][emoji_id].instance_count
-
-                print(increase)
+                inst_increase = emoji.instance_count - self.model.db[ctx.guild.id][prior_date][emoji_id].instance_count
+                total_increase = emoji.total_count - self.model.db[ctx.guild.id][prior_date][emoji_id].total_count
 
                 output += str(emoji.emoji_obj) + ' : ' + \
-                          str(emoji.instance_count) + ' [ ' + \
-                          str(increase) + '↑]\n'
-
+                          str(emoji.instance_count) + ' [ ' + str(inst_increase) + '↑] - ' + \
+                          str(emoji.total_count) + ' [ ' + str(total_increase) + '↑]\n'
 
                 if i % 5 == 4:
-                    print(output)
                     embed.add_field(name=str(i - 3) + ' - ' + str(i + 1), value=output, inline=False)
                     output = ''
-            print(output)
             if output is not '':
                 embed.add_field(name=str(len(msg) - (len(msg) % 5) + 1) + ' - ' + str(len(msg)), value=output,
                                 inline=False)
+            embed.set_footer(text=str(prior_date) + ' to ' + str(last_date))
         else:
             embed = discord.Embed(title='Untitled')
             embed.add_field(name='Field 1', value=msg)

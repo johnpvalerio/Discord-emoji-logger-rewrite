@@ -18,12 +18,12 @@ def format_date(date):
     """
     if date.month == 12:
         print('12')
-        return date.replace(year=date.year + 1, month=1, day=1)
-        # return date.replace(year=date.year + 1, month=1, hour=0, minute=0, second=0, microsecond=0)
+        # return date.replace(year=date.year + 1, month=1, day=1)
+        return date.replace(year=date.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
     else:
         print('add')
-        return date.replace(month=date.month + 1, day=1)
-        # return date.replace(month=date.month + 1, hour=0, minute=0, second=0, microsecond=0)
+        # return date.replace(month=date.month + 1, day=1)
+        return date.replace(month=date.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
 def next_dates(start_date):
@@ -138,7 +138,7 @@ class Model(commands.Cog):
                 date_index = date_index + 1
 
                 if date_index > date_max_index:
-                    print('STOP')
+                    # print('STOP')
                     return
             # skip if message from the bot
             if message.author.bot:
@@ -178,7 +178,6 @@ class Model(commands.Cog):
         @param total_inc: int total count increase
         @return: None
         """
-        print(date_list)
         for date in date_list:
             self.db[guild_id][date][emoji_ID].instance_count += inst_inc
             self.db[guild_id][date][emoji_ID].total_count += total_inc
@@ -192,12 +191,12 @@ class Model(commands.Cog):
         @return: None
         """
         for emoji_id in self.db[guild_id][date1]:
-            print(emoji_id)
+            # print(emoji_id)
             try:
                 self.db[guild_id][date1][emoji_id].instance_count += self.db[guild_id][date2][emoji_id].instance_count
                 self.db[guild_id][date1][emoji_id].total_count += self.db[guild_id][date2][emoji_id].total_count
-                print(self.db[guild_id][date1][emoji_id].instance_count, ' + ',
-                      self.db[guild_id][date2][emoji_id].instance_count)
+                # print(self.db[guild_id][date1][emoji_id].instance_count, ' + ',
+                #       self.db[guild_id][date2][emoji_id].instance_count)
             except KeyError:
                 print('no entry for emoji')
 
@@ -217,7 +216,6 @@ class Model(commands.Cog):
             emoji_dict[current_emoji.id] = EmojiStat.EmojiStat(current_emoji)
         return emoji_dict
 
-    # todo: export to firebase database
     def export(self):
         print('Saving JSON file...')
         temp_db = {}
@@ -225,9 +223,12 @@ class Model(commands.Cog):
             temp_db[guild_ID] = {}
             for date in self.db[guild_ID]:
                 temp_db[guild_ID][date.strftime('%Y-%m-%d %H:%M:%S')] = self.db[guild_ID][date]
-        # print(temp_db)
         with open('emoji-data.json', 'w', encoding='utf-8') as write_file:
             json.dump(temp_db, write_file, indent=2, default=encoder_json)
+        # export to firebase
+        with open('emoji-data.json', 'r', encoding='utf-8') as read_file:
+            ref = db.reference('')
+            ref.update(json.load(read_file))
 
     def fix_db(self, database):
         """

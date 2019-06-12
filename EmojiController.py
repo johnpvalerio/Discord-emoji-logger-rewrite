@@ -41,6 +41,7 @@ class Controller(commands.Cog):
         # default do nothing
         else:
             return
+
         # log emojis in bot viewable channels
         for current_channel in list(filter(lambda channel:
                                            channel.permissions_for(ctx.guild.me).read_messages,
