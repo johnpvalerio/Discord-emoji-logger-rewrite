@@ -10,6 +10,40 @@ from firebase_admin import db
 import EmojiStat
 
 
+def format_date(date):
+    """
+    Format date as first of every month
+    @param date: datetime target date
+    @return: datetime formatted
+    """
+    if date.month == 12:
+        print('12')
+        return date.replace(year=date.year + 1, month=1, day=1)
+        # return date.replace(year=date.year + 1, month=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        print('add')
+        return date.replace(month=date.month + 1, day=1)
+        # return date.replace(month=date.month + 1, hour=0, minute=0, second=0, microsecond=0)
+
+
+def next_dates(start_date):
+    """
+    Creates list of dates not yet processed, from last entered to now
+    @param start_date: starting datetime date
+    @return: list of datetime
+    """
+    date_list = []
+    # set dates from start to now
+    while start_date < datetime.datetime.now():
+        print('\t', start_date)
+        start_date = format_date(start_date)
+        print('now: ', datetime.datetime.now(), ' - current: ', start_date)
+        date_list.append(start_date)
+
+    print(date_list[:-1])
+    return date_list[:-1]
+
+
 class Model(commands.Cog):
 
     def __init__(self, bot):
@@ -57,10 +91,10 @@ class Model(commands.Cog):
         """
         # start from beginning
         if start_date is None:
-            date_list = await self.next_dates(self.bot.get_guild(guild_ID).created_at)
+            date_list = next_dates(self.bot.get_guild(guild_ID).created_at)
         # start from date given
         else:
-            date_list = await self.next_dates(start_date)
+            date_list = next_dates(start_date)
         # add emojis
         for date in date_list:
             self.db[guild_ID][date] = await self.compile_emoji(guild_ID)
@@ -79,11 +113,12 @@ class Model(commands.Cog):
         # make list of dates
         for date in self.db[channel.guild.id]:
             date_list.append(date)
-        print(channel)
+        print('\n', channel)
         # log emoji for channel
-        await self.log_emoji(channel, start_date, datetime.datetime.now(), date_list)
+        await self.log_emoji(channel=channel, date_after=start_date,
+                             date_stop=datetime.datetime.now(), date_list=date_list)
 
-    # todo: total_count is weird sometimes
+    # todo: use msg date created as keys
     # compile emoji in all channels between given dates
     async def log_emoji(self, channel, date_after, date_stop, date_list):
         """
@@ -101,7 +136,9 @@ class Model(commands.Cog):
             # move date to next closest
             while message.created_at >= date_list[date_index]:
                 date_index = date_index + 1
-                if date_max_index == date_index:
+
+                if date_index > date_max_index:
+                    print('STOP')
                     return
             # skip if message from the bot
             if message.author.bot:
@@ -122,7 +159,8 @@ class Model(commands.Cog):
                                      if not emoji_server.managed),
                        emoji_found))
 
-            print('emojis found: ', emoji_found, ' - date: ', date_list[date_index:])
+            if not emoji_found:
+                continue
 
             # update emoji counts
             for emoji in set(emoji_found):
@@ -140,6 +178,7 @@ class Model(commands.Cog):
         @param total_inc: int total count increase
         @return: None
         """
+        print(date_list)
         for date in date_list:
             self.db[guild_id][date][emoji_ID].instance_count += inst_inc
             self.db[guild_id][date][emoji_ID].total_count += total_inc
@@ -161,33 +200,6 @@ class Model(commands.Cog):
                       self.db[guild_id][date2][emoji_id].instance_count)
             except KeyError:
                 print('no entry for emoji')
-
-    async def next_dates(self, start_date):
-        """
-        Creates list of dates not yet processed, from last entered to now
-        @param start_date: starting datetime date
-        @return: list of datetime
-        """
-        date_list = []
-
-        # set dates from start to now
-        while start_date < datetime.datetime.now():
-            start_date = self.format_date(start_date)
-            date_list.append(start_date)
-
-        print(date_list[:-1])
-        return date_list[:-1]
-
-    def format_date(self, date):
-        """
-        Format date as first of every month
-        @param date: datetime target date
-        @return: datetime formatted
-        """
-        if date.month == 12:
-            return date.replace(year=date.year + 1, month=1)
-        else:
-            return date.replace(month=date.month + 1)
 
     async def compile_emoji(self, guild_ID):
         """
