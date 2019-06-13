@@ -74,21 +74,9 @@ class View(commands.Cog):
         fig.savefig('pie.png')
         await ctx.send(file=discord.File('pie.png'))
 
-    # todo: fix if msg too long (many emotes)
     async def table(self, ctx):
-        str_output = ''
-
         # sort by instance count into list: (id, EmojiStat)
         sorted_emojis = self.sort(ctx, 'instance')
-
-        # create output string
-        # emoji: (id, EmojiStat)
-        for emoji in sorted_emojis:
-            emoji_id = emoji.emoji_obj.id
-            str_output += str(ctx.bot.get_emoji(emoji_id)) + \
-                          ' - ' + str(emoji.instance_count) + \
-                          '\n'
-
         await self.embed(ctx, sorted_emojis)
 
     # todo: more info like % increase, date, etc
@@ -101,12 +89,14 @@ class View(commands.Cog):
                 emoji_id = msg[i].emoji_obj.id
                 last_date = list(self.model.db[ctx.guild.id])[-1]
                 prior_date = list(self.model.db[ctx.guild.id])[-2]
+                date_used = emoji.last_used
                 inst_increase = emoji.instance_count - self.model.db[ctx.guild.id][prior_date][emoji_id].instance_count
                 total_increase = emoji.total_count - self.model.db[ctx.guild.id][prior_date][emoji_id].total_count
 
                 output += str(emoji.emoji_obj) + ' : ' + \
                           str(emoji.instance_count) + ' [ ' + str(inst_increase) + '↑] - ' + \
-                          str(emoji.total_count) + ' [ ' + str(total_increase) + '↑]\n'
+                          str(emoji.total_count) + ' [ ' + str(total_increase) + '↑]    (last used: ' + \
+                          str(date_used) + ')\n'
 
                 if i % 5 == 4:
                     embed.add_field(name=str(i - 3) + ' - ' + str(i + 1), value=output, inline=False)
@@ -155,12 +145,16 @@ class View(commands.Cog):
         # add frequency, y - values
         for date in reverse_dates:
             for emoji in sorted_emojis:
-                if sort_type == 'instance':
-                    temp.append(self.model.db[ctx.guild.id][date][emoji.emoji_obj.id].instance_count)
-                elif sort_type == 'total':
-                    temp.append(self.model.db[ctx.guild.id][date][emoji.emoji_obj.id].total_count)
-                else:
-                    temp.append(self.model.db[ctx.guild.id][date][emoji.emoji_obj.id].instance_count)
+                try:
+                    if sort_type == 'instance':
+                        temp.append(self.model.db[ctx.guild.id][date][emoji.emoji_obj.id].instance_count)
+                    elif sort_type == 'total':
+                        temp.append(self.model.db[ctx.guild.id][date][emoji.emoji_obj.id].total_count)
+                    else:
+                        temp.append(self.model.db[ctx.guild.id][date][emoji.emoji_obj.id].instance_count)
+                # if no entry at that date, add 0
+                except KeyError:
+                    temp.append(0)
             list_vals.append(temp)
             temp = []
             # add dates to legend, 5 entries

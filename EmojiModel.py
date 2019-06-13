@@ -166,21 +166,23 @@ class Model(commands.Cog):
             for emoji in set(emoji_found):
                 emoji_count = emoji_found.count(emoji)
                 self.update_data(guild_id=channel.guild.id, date_list=date_list[date_index:],
-                                 emoji_ID=int(emoji[-19:-1]), inst_inc=1, total_inc=emoji_count)
+                                 emoji_id=int(emoji[-19:-1]), inst_inc=1, total_inc=emoji_count,
+                                 date_used=message.created_at)
 
-    def update_data(self, guild_id, date_list, emoji_ID, inst_inc, total_inc):
+    def update_data(self, guild_id, date_list, emoji_id, inst_inc, total_inc, date_used):
         """
         update stats for given emoji in upcoming dates
         @param guild_id: int guild ID
         @param date_list: datetime list of all datetime to go through
-        @param emoji_ID: int emoji ID
+        @param emoji_id: int emoji ID
         @param inst_inc: int instance count increase (default 1)
         @param total_inc: int total count increase
         @return: None
         """
         for date in date_list:
-            self.db[guild_id][date][emoji_ID].instance_count += inst_inc
-            self.db[guild_id][date][emoji_ID].total_count += total_inc
+            self.db[guild_id][date][emoji_id].instance_count += inst_inc
+            self.db[guild_id][date][emoji_id].total_count += total_inc
+            self.db[guild_id][date][emoji_id].last_used = date_used
 
     def merge_entry(self, guild_id, date1, date2):
         """
@@ -241,11 +243,11 @@ class Model(commands.Cog):
             temp_date = {}
             for date in database[guild]:
                 temp_emoji = {}
-                for emoji_ID in database[guild][date]:
+                for emoji_id in database[guild][date]:
                     emoji_val = []
-                    for word, val in database[guild][date][emoji_ID].items():
+                    for word, val in database[guild][date][emoji_id].items():
                         emoji_val.append(val)
-                    temp_emoji[int(emoji_ID)] = EmojiStat.EmojiStat(self.bot.get_emoji(int(emoji_ID)), emoji_val[0],
+                    temp_emoji[int(emoji_id)] = EmojiStat.EmojiStat(self.bot.get_emoji(int(emoji_id)), emoji_val[0],
                                                                     emoji_val[1])
                 date_obj = datetime.datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
                 temp_date[date_obj] = temp_emoji
