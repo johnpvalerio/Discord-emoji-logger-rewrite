@@ -9,6 +9,25 @@ from matplotlib.legend_handler import HandlerBase
 from matplotlib.transforms import Bbox, TransformedBbox
 
 
+def bottom_calc(list_items):
+    """
+    Helper for bar graph creation, sets bottom attribute for bar stacking
+    @param list_items: list of items to process
+    @return: 0 default - list of ints matrix add
+    """
+    output = None
+    # default: x axis floor
+    if len(list_items) == 0:
+        return 0
+    # else: add all previous entries
+    for x in list_items:
+        if output is None:
+            output = x
+        else:
+            output = [sum(y) for y in zip(output, x)]
+    return output
+
+
 class View(commands.Cog):
     def __init__(self, model, bot):
         self.model = model
@@ -65,9 +84,9 @@ class View(commands.Cog):
         # create output string
         # emoji: (id, EmojiStat)
         for emoji in sorted_emojis:
-            emoji_id = emoji[1].emoji_obj.id
+            emoji_id = emoji.emoji_obj.id
             str_output += str(ctx.bot.get_emoji(emoji_id)) + \
-                          ' - ' + str(emoji[1].instance_count) + \
+                          ' - ' + str(emoji.instance_count) + \
                           '\n'
 
         await self.embed(ctx, sorted_emojis)
@@ -78,8 +97,8 @@ class View(commands.Cog):
             output = ''
             embed = discord.Embed(title=ctx.guild.name + '\'s emoji stats')
             for i in range(len(msg)):
-                emoji = msg[i][1]
-                emoji_id = msg[i][0]
+                emoji = msg[i]
+                emoji_id = msg[i].emoji_obj.id
                 last_date = list(self.model.db[ctx.guild.id])[-1]
                 prior_date = list(self.model.db[ctx.guild.id])[-2]
                 inst_increase = emoji.instance_count - self.model.db[ctx.guild.id][prior_date][emoji_id].instance_count
@@ -101,14 +120,17 @@ class View(commands.Cog):
             embed.add_field(name='Field 1', value=msg)
         await ctx.send(embed=embed)
 
-    # todo: sort by alphabetical order
-    async def bar(self, ctx, type='instance'):
+    async def bar(self, ctx, sort_type='instance'):
         list_names = []  # x tick labels
         list_vals = []  # y values
+        list_legend = []  # legend values
+        temp = []  # list_vals temporary container
         width = 0.3  # bar width size
         y_max = 100  # y delimiter
+        counter = 0  # legend counter
 
         last_date = list(self.model.db[ctx.guild.id])[-1]  # latest date
+        reverse_dates = reversed(list(self.model.db[ctx.guild.id]))  # dates for stacks
         emote_size = len(self.model.db[ctx.guild.id][last_date])  # number of emojis
         ind = [x for x in range(emote_size)]  # list of ints to space graph
 
@@ -122,44 +144,45 @@ class View(commands.Cog):
         else:
             text_size = 12
 
-        sorted_emojis = self.sort(ctx, type)
+        # sort by desired type
+        sorted_emojis = self.sort(ctx, sort_type)
 
-        # for emoji_id, emoji in self.model.db[ctx.guild.id][last_date].items():
+        # add emoji names, x - values
         for emoji in sorted_emojis:
-            list_names.append(emoji[1].emoji_obj.name)
-            list_vals.append(emoji[1].instance_count)
-            if y_max < emoji[1].instance_count:
-                y_max = emoji[1].instance_count
+            list_names.append(emoji.emoji_obj.name)
+            if y_max < emoji.instance_count:
+                y_max = emoji.instance_count
+        # add frequency, y - values
+        for date in reverse_dates:
+            for emoji in sorted_emojis:
+                if sort_type == 'instance':
+                    temp.append(self.model.db[ctx.guild.id][date][emoji.emoji_obj.id].instance_count)
+                elif sort_type == 'total':
+                    temp.append(self.model.db[ctx.guild.id][date][emoji.emoji_obj.id].total_count)
+                else:
+                    temp.append(self.model.db[ctx.guild.id][date][emoji.emoji_obj.id].instance_count)
+            list_vals.append(temp)
+            temp = []
+            # add dates to legend, 5 entries
+            if counter < 5:
+                list_legend.append(date)
+                counter += 1
+        # add values into bar graph
+        for i in range(len(list_vals)):
+            plt.bar(ind, list_vals[i], width)
 
-        plt.ylim([0, y_max])
-        plt.bar(ind, list_vals, width)
-        plt.xticks(ind, list_names, fontsize=text_size, rotation=90)
-        plt.xlabel('Emoji')
-        plt.ylabel('Single instance count')
+        plt.ylim([0, y_max + 10])  # y upper limit
+        plt.xticks(ind, list_names, fontsize=text_size, rotation=90)  # x tick title values
+        plt.xlabel('Emoji')  # x label
+        plt.ylabel('Single instance count')  # y label
         plt.title("Bar graph of emote use in " + ctx.guild.name)  # title
+        plt.legend(list_legend, loc=0)  # legend
+        
         fig = plt.gcf()
         plt.show()
         plt.draw()
         fig.savefig('graph.png', bbox_inches='tight')
         await ctx.send(file=discord.File('graph.png'))
-
-    def bottom_calc(self, list_items):
-        """
-        Helper for bar graph creation, sets bottom attribute for bar stacking
-        @param list_items: list of items to process
-        @return: 0 default - list of ints matrix add
-        """
-        output = None
-        # default: x axis floor
-        if len(list_items) == 0:
-            return 0
-        # else: add all previous entries
-        for x in list_items:
-            if output is None:
-                output = x
-            else:
-                output = [sum(y) for y in zip(output, x)]
-        return output
 
     # todo: legend ordering
     # note: matplotlib creates x axis if not enough/too little distance from start/end
@@ -247,36 +270,35 @@ class View(commands.Cog):
         Creates a sorted copy of the data of the latest date as a list
         @param ctx: Discord context
         @param sort_type: string sorting type: 'instance', 'total', 'alpha'
-        @return: list (id, EmojiStat)
+        @return: list (EmojiStat)
         """
-        # sort by instance_count descending order
-        if sort_type == 'instance':
-            last_date = list(self.model.db[ctx.guild.id])[-1]
-            dict_emojis = {}
+        last_date = list(self.model.db[ctx.guild.id])[-1]
+        list_emojis = []
+        for x, y in self.model.db[ctx.guild.id][last_date].items():
+            list_emojis.append(y)
 
-            for x, y in self.model.db[ctx.guild.id][last_date].items():
-                dict_emojis[x] = y
-            # sort by instance count into list: (id, EmojiStat)
-            sorted_emojis = sorted(dict_emojis.items(),
-                                   key=lambda kv: getattr(kv[1], 'instance_count'),
+        # sort by instance count into list: EmojiStat
+        if sort_type == 'instance':
+            sorted_emojis = sorted(list_emojis,
+                                   key=lambda kv: getattr(kv, 'instance_count'),
                                    reverse=True)
-            return sorted_emojis
         # sort by total_count descending order
         elif sort_type == 'total':
-            last_date = list(self.model.db[ctx.guild.id])[-1]
-            dict_emojis = {}
-
-            for x, y in self.model.db[ctx.guild.id][last_date].items():
-                dict_emojis[x] = y
             # sort by instance count into list: (id, EmojiStat)
-            sorted_emojis = sorted(dict_emojis.items(),
-                                   key=lambda kv: getattr(kv[1], 'total_count'),
+            sorted_emojis = sorted(list_emojis,
+                                   key=lambda kv: getattr(kv, 'total_count'),
                                    reverse=True)
-            return sorted_emojis
-        # todo: create alphabetical sort
         # sort by emoji's name alphabetical order
         elif sort_type == 'alpha':
-            pass
+            sorted_emojis = sorted(list_emojis,
+                                   key=lambda kv: getattr(kv.emoji_obj, 'name'),
+                                   reverse=False)
+        # default to sorting by instance
+        else:
+            sorted_emojis = sorted(list_emojis,
+                                   key=lambda kv: getattr(kv, 'instance_count'),
+                                   reverse=True)
+        return sorted_emojis
 
 
 class HandlerLineImage(HandlerBase):

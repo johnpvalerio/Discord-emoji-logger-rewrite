@@ -20,7 +20,6 @@ class Controller(commands.Cog):
         await self.view.print(ctx, str_output)
 
     @commands.command()
-    # @commands.has_permissions(administrator=True)
     @commands.has_permissions(manage_guild=True)
     async def log(self, ctx, *args):
         print("\n--------------------------")
@@ -69,7 +68,7 @@ class Controller(commands.Cog):
         await self.view.print(ctx, msg)
 
     @commands.command('exp')
-    @commands.has_permissions(administrator=True)
+    @commands.has_permissions(manage_guild=True)
     async def export(self, ctx, *args):
         print("\n--------------------------")
         print('[COMMAND] - exp()')
@@ -109,8 +108,12 @@ class Controller(commands.Cog):
         await self.view.embed(ctx, msg)
 
     @commands.command()
-    async def bar(self, ctx):
+    async def bar(self, ctx, *arg):
         print("\n--------------------------")
         print('[COMMAND] - bar()')
         print("--------------------------")
-        await self.view.bar(ctx)
+        if arg:
+            arg = arg[0]
+            await self.view.bar(ctx, arg)
+        else:
+            await self.view.bar(ctx)
