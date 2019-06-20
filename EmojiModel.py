@@ -218,7 +218,7 @@ class Model(commands.Cog):
             emoji_dict[current_emoji.id] = EmojiStat.EmojiStat(current_emoji)
         return emoji_dict
 
-    def export(self):
+    def export(self, guild_id):
         print('Saving JSON file...')
         temp_db = {}
         for guild_ID, date_key in self.db.items():
@@ -229,9 +229,10 @@ class Model(commands.Cog):
             json.dump(temp_db, write_file, indent=2, default=encoder_json)
         # export to firebase
         with open('emoji-data.json', 'r', encoding='utf-8') as read_file:
-            ref = db.reference('')
-            ref.update(json.load(read_file))
+            ref = db.reference(str(guild_id))
+            ref.update(json.load(read_file)[str(guild_id)])
 
+    # todo: add last used date
     def fix_db(self, database):
         """
         Converts FireBase file content into proper manageable objects (datetime & EmojiStat)
@@ -257,6 +258,11 @@ class Model(commands.Cog):
 
 
 def encoder_json(file_object):
+    """
+    JSON helper, encodes non native JSON objects
+    @param file_object: obj
+    @return: EmojiStat object: string, datetime: string
+    """
     print(str(file_object), ' - ', type(file_object))
     if isinstance(file_object, EmojiStat.EmojiStat):
         return {'instance_count': file_object.instance_count, 'total_count': file_object.total_count}

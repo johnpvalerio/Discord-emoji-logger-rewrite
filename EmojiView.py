@@ -36,9 +36,20 @@ class View(commands.Cog):
         print('View ON')
 
     async def print(self, ctx, msg):
+        """
+        Sends string message to discord user
+        @param ctx: Discord context
+        @param msg: string message
+        @return: None
+        """
         await ctx.send(msg)
 
     async def db(self, ctx):
+        """
+        Prints all contents of data values ordered by dates
+        @param ctx: Discord context
+        @return: None
+        """
         print(self.model.db)
 
         for date, val2 in self.model.db[ctx.guild.id].items():
@@ -75,12 +86,23 @@ class View(commands.Cog):
         await ctx.send(file=discord.File('pie.png'))
 
     async def table(self, ctx):
+        """
+        Create and send embedded message of latest data values in descending order
+        @param ctx: Discord context
+        @return: None
+        """
         # sort by instance count into list: (id, EmojiStat)
         sorted_emojis = self.sort(ctx, 'instance')
         await self.embed(ctx, sorted_emojis)
 
     # todo: more info like % increase, date, etc
     async def embed(self, ctx, msg):
+        """
+        Creates and sends embedded message
+        @param ctx: Discord context
+        @param msg: Display content
+        @return: None
+        """
         if type(msg) is list:
             output = ''
             embed = discord.Embed(title=ctx.guild.name + '\'s emoji stats')
@@ -111,6 +133,12 @@ class View(commands.Cog):
         await ctx.send(embed=embed)
 
     async def bar(self, ctx, sort_type='instance'):
+        """
+        Creates and sends bar graph of data in descending order
+        @param ctx: Discord context
+        @param sort_type: String of type (instance, total, alpha)
+        @return: None
+        """
         list_names = []  # x tick labels
         list_vals = []  # y values
         list_legend = []  # legend values
@@ -178,10 +206,14 @@ class View(commands.Cog):
         fig.savefig('graph.png', bbox_inches='tight')
         await ctx.send(file=discord.File('graph.png'))
 
-    # todo: legend ordering
-    # note: matplotlib creates x axis if not enough/too little distance from start/end
-    # ignore 0's (twitch emotes)
+    # todo: legend ordering, ignore 0's (twitch emotes)
     async def graph(self, ctx):
+        """
+        Creates and sends line graph of data values
+        @param ctx: Discord context
+        @return: None
+        note: note: matplotlib creates x axis if not enough/too little distance from start/end
+        """
         dates = []  # dates
         url = []  # emoji URL
         lines = []  # graph lines
@@ -197,10 +229,6 @@ class View(commands.Cog):
         dates = dates[-MAX_DATES:]
 
         print(dates)
-
-        # emoji
-        # todo: fix for large values
-        # plot lines: dates & list_graph_emoji (inst_count)
 
         # temp_db holds list of date & instance count keyed by emoji ID
         for date in dates:

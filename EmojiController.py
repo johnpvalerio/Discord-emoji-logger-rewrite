@@ -10,6 +10,13 @@ class Controller(commands.Cog):
 
     @commands.command()
     async def me(self, ctx, args):
+        """
+        Repeats user input message and returns it all spaced out in bold
+        Sends to view for display
+        @param ctx: Discord context
+        @param args: String user input argument
+        @return: None
+        """
         print("\n--------------------------")
         print('[COMMAND] - me()')
         print("--------------------------")
@@ -22,6 +29,12 @@ class Controller(commands.Cog):
     @commands.command()
     @commands.has_permissions(manage_guild=True)
     async def log(self, ctx, *args):
+        """
+        Logs emojis, sets up logging parameters then calls model for logging
+        @param ctx: Discord context
+        @param args: List user input arguments
+        @return: None
+        """
         print("\n--------------------------")
         print('[COMMAND] - log()')
         print("--------------------------")
@@ -60,6 +73,12 @@ class Controller(commands.Cog):
 
     @commands.command()
     async def re(self, ctx, *args):
+        """
+        Repeats user input, sends to view for display
+        @param ctx: Discord context
+        @param args: List user input arguments
+        @return: None
+        """
         print("\n--------------------------")
         print('[COMMAND] - re()')
         print("--------------------------")
@@ -69,16 +88,25 @@ class Controller(commands.Cog):
 
     @commands.command('exp')
     @commands.has_permissions(manage_guild=True)
-    async def export(self, ctx, *args):
+    async def export(self, ctx):
+        """
+        Export db contents, calls model to update & save to firebase (and locally)
+        @param ctx: Discord context
+        @return: None
+        """
         print("\n--------------------------")
         print('[COMMAND] - exp()')
         print("--------------------------")
-        print(args)
-        self.model.export()
+        self.model.export(ctx.guild.id)
         await self.view.print(ctx, 'done')
 
     @commands.command('graph')
     async def plot(self, ctx):
+        """
+        Creates time series graph, calls model for creation
+        @param ctx: Discord context
+        @return: None
+        """
         print("\n--------------------------")
         print('[COMMAND] - graph()')
         print("--------------------------")
@@ -86,6 +114,11 @@ class Controller(commands.Cog):
 
     @commands.command('pie')
     async def pie(self, ctx):
+        """
+        Creates pie chart of latest data values, calls model for creation
+        @param ctx: Discord context
+        @return: None
+        """
         print("\n--------------------------")
         print('[COMMAND] - pie()')
         print("--------------------------")
@@ -93,6 +126,11 @@ class Controller(commands.Cog):
 
     @commands.command()
     async def table(self, ctx):
+        """
+        Creates table of all values formatted in descending order, calls model for creation
+        @param ctx: Discord context
+        @return: None
+        """
         print("\n--------------------------")
         print('[COMMAND] - table()')
         print("--------------------------")
@@ -100,6 +138,12 @@ class Controller(commands.Cog):
 
     @commands.command('emb')
     async def embed(self, ctx, *args):
+        """
+        Creates embedded message of user input, calls model for creation using default values
+        @param ctx: Discord context
+        @param args: List user input arguments
+        @return: None
+        """
         print("\n--------------------------")
         print('[COMMAND] - embed()')
         print("--------------------------")
@@ -109,6 +153,14 @@ class Controller(commands.Cog):
 
     @commands.command()
     async def bar(self, ctx, *arg):
+        """
+        Creates stacked bar graph of db data values, calls model for creation
+        If no arguments, calls default format (instance)
+        else, uses desired type: instance, total, alpha (alphabetical)
+        @param ctx: Discord context
+        @param arg: list user input arguments
+        @return: None
+        """
         print("\n--------------------------")
         print('[COMMAND] - bar()')
         print("--------------------------")
