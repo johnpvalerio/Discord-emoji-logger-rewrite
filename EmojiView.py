@@ -73,8 +73,8 @@ class View(commands.Cog):
         sorted_emojis = self.sort(ctx, 'instance')
 
         for emoji in sorted_emojis:
-            labels.append(emoji[1].emoji_obj.name)
-            values.append(emoji[1].instance_count)
+            labels.append(emoji.emoji_obj.name)
+            values.append(emoji.instance_count)
 
         fig, ax = plt.subplots()
         ax.pie(values, labels=labels, autopct='%1.1f%%')
@@ -143,9 +143,10 @@ class View(commands.Cog):
         list_vals = []  # y values
         list_legend = []  # legend values
         temp = []  # list_vals temporary container
-        width = 0.3  # bar width size
-        y_max = 100  # y delimiter
+        WIDTH = 0.3  # bar width size
+        Y_MAX = 50  # y delimiter
         counter = 0  # legend counter
+        NB_ENTRIES = 5
 
         last_date = list(self.model.db[ctx.guild.id])[-1]  # latest date
         reverse_dates = reversed(list(self.model.db[ctx.guild.id]))  # dates for stacks
@@ -168,8 +169,8 @@ class View(commands.Cog):
         # add emoji names, x - values
         for emoji in sorted_emojis:
             list_names.append(emoji.emoji_obj.name)
-            if y_max < emoji.instance_count:
-                y_max = emoji.instance_count
+            if Y_MAX < emoji.instance_count:
+                Y_MAX = emoji.instance_count
         # add frequency, y - values
         for date in reverse_dates:
             for emoji in sorted_emojis:
@@ -181,19 +182,31 @@ class View(commands.Cog):
                     else:
                         temp.append(self.model.db[ctx.guild.id][date][emoji.emoji_obj.id].instance_count)
                 # if no entry at that date, add 0
-                except KeyError:
+                except KeyError as e:
+                    print(e)
                     temp.append(0)
-            list_vals.append(temp)
-            temp = []
+
             # add dates to legend, 5 entries
-            if counter < 5:
-                list_legend.append(date)
+            if counter < NB_ENTRIES:
+                list_legend.append(date.strftime('%Y-%m-%d'))
+                list_vals.append(temp)
+                temp = []
                 counter += 1
+
+        # formats bar values such that only latest values are applied and not overwritten by old ones
+        for list_index in reversed(range(len(list_vals))):
+            for entry_index in range(len(list_vals[list_index])):
+                if list_vals[list_index][entry_index] == list_vals[list_index - 1][entry_index]:
+                    list_vals[list_index][entry_index] = 0
+
+        # todo: add 6th bar color - rest of the date values
+
         # add values into bar graph
         for i in range(len(list_vals)):
-            plt.bar(ind, list_vals[i], width)
+            plt.bar(ind, list_vals[i], WIDTH, bottom=0)
+            # plt.show()
 
-        plt.ylim([0, y_max + 10])  # y upper limit
+        plt.ylim([0, Y_MAX + 10])  # y upper limit
         plt.xticks(ind, list_names, fontsize=text_size, rotation=90)  # x tick title values
         plt.xlabel('Emoji')  # x label
         plt.ylabel('Single instance count')  # y label
