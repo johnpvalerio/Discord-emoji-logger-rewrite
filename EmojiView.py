@@ -111,7 +111,8 @@ class View(commands.Cog):
                 emoji_id = msg[i].emoji_obj.id
                 last_date = list(self.model.db[ctx.guild.id])[-1]
                 prior_date = list(self.model.db[ctx.guild.id])[-2]
-                date_used = emoji.last_used
+                print(emoji.last_used)
+                date_used = emoji.last_used.strftime('%Y-%m-%d') if emoji.last_used is not None else emoji.last_used
                 inst_increase = emoji.instance_count - self.model.db[ctx.guild.id][prior_date][emoji_id].instance_count
                 total_increase = emoji.total_count - self.model.db[ctx.guild.id][prior_date][emoji_id].total_count
 
@@ -126,7 +127,7 @@ class View(commands.Cog):
             if output is not '':
                 embed.add_field(name=str(len(msg) - (len(msg) % 5) + 1) + ' - ' + str(len(msg)), value=output,
                                 inline=False)
-            embed.set_footer(text=str(prior_date) + ' to ' + str(last_date))
+            embed.set_footer(text=str(prior_date.strftime('%Y-%m-%d')) + ' to ' + str(last_date.strftime('%Y-%m-%d')))
         else:
             embed = discord.Embed(title='Untitled')
             embed.add_field(name='Field 1', value=msg)
@@ -216,7 +217,7 @@ class View(commands.Cog):
         fig = plt.gcf()
         plt.show()
         plt.draw()
-        fig.savefig('graph.png', bbox_inches='tight')
+        fig.savefig('graph.png', bbox_inches='tight', dpi=900)
         await ctx.send(file=discord.File('graph.png'))
 
     # todo: legend ordering, ignore 0's (twitch emotes)
