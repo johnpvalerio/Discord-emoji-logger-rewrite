@@ -232,7 +232,6 @@ class Model(commands.Cog):
             ref = db.reference(str(guild_id))
             ref.update(json.load(read_file)[str(guild_id)])
 
-    # todo: add last used date
     def fix_db(self, database):
         """
         Converts FireBase file content into proper manageable objects (datetime & EmojiStat)
@@ -245,11 +244,14 @@ class Model(commands.Cog):
             for date in database[guild]:
                 temp_emoji = {}
                 for emoji_id in database[guild][date]:
-                    emoji_val = []
-                    for word, val in database[guild][date][emoji_id].items():
-                        emoji_val.append(val)
-                    temp_emoji[int(emoji_id)] = EmojiStat.EmojiStat(self.bot.get_emoji(int(emoji_id)), emoji_val[0],
-                                                                    emoji_val[1])
+                    inst = database[guild][date][emoji_id]['instance_count']
+                    tot = database[guild][date][emoji_id]['total_count']
+                    last = database[guild][date][emoji_id]['last_used']
+                    last = datetime.datetime.strptime(last, '%Y-%m-%d %H:%M:%S.%f') if last != 'None' else None
+                    temp_emoji[int(emoji_id)] = EmojiStat.EmojiStat(self.bot.get_emoji(int(emoji_id)),
+                                                                    inst,
+                                                                    tot,
+                                                                    last)
                 date_obj = datetime.datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
                 temp_date[date_obj] = temp_emoji
             temp_db[int(guild)] = temp_date
@@ -265,7 +267,7 @@ def encoder_json(file_object):
     """
     print(str(file_object), ' - ', type(file_object))
     if isinstance(file_object, EmojiStat.EmojiStat):
-        return {'instance_count': file_object.instance_count, 'total_count': file_object.total_count}
-    if isinstance(file_object, datetime.datetime):
-        return file_object.__str__()
+        return {'instance_count': file_object.instance_count,
+                'total_count': file_object.total_count,
+                'last_used': file_object.last_used.__str__()}
     return None
