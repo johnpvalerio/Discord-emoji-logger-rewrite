@@ -200,12 +200,9 @@ class View(commands.Cog):
                 if list_vals[list_index][entry_index] == list_vals[list_index - 1][entry_index]:
                     list_vals[list_index][entry_index] = 0
 
-        # todo: add 6th bar color - rest of the date values
-
         # add values into bar graph
         for i in range(len(list_vals)):
             plt.bar(ind, list_vals[i], WIDTH, bottom=0)
-            # plt.show()
 
         plt.ylim([0, Y_MAX + 10])  # y upper limit
         plt.xticks(ind, list_names, fontsize=text_size, rotation=90)  # x tick title values
