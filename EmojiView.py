@@ -28,6 +28,10 @@ def bottom_calc(list_items):
     return output
 
 
+def perc(val, total):
+    return val / total * 100
+
+
 class View(commands.Cog):
     def __init__(self, model, bot):
         self.model = model
@@ -103,23 +107,52 @@ class View(commands.Cog):
         @param msg: Display content
         @return: None
         """
+        # msg is emojistat objects sorted by instance
         if type(msg) is list:
+
             output = ''
             embed = discord.Embed(title=ctx.guild.name + '\'s emoji stats')
+            embed.set_thumbnail(url=str(ctx.guild.icon_url))
+
+            curr_date = list(self.model.db[ctx.guild.id])[-1]
+            prior_date = list(self.model.db[ctx.guild.id])[-2]
+
+            curr_inst_sum = sum([x.instance_count for x in msg])
+            curr_total_sum = sum([x.total_count for x in msg])
+            prior_inst_sum = sum(
+                self.model.db[ctx.guild.id][prior_date][y].instance_count for y in [x.emoji_obj.id for x in msg])
+            prior_total_sum = sum(
+                self.model.db[ctx.guild.id][prior_date][y].total_count for y in [x.emoji_obj.id for x in msg])
+
+            print(curr_inst_sum)
+            print(prior_inst_sum)
+            for emoji in msg:
+                print(emoji)
+            # iterate through emojis
             for i in range(len(msg)):
                 emoji = msg[i]
                 emoji_id = msg[i].emoji_obj.id
-                last_date = list(self.model.db[ctx.guild.id])[-1]
-                prior_date = list(self.model.db[ctx.guild.id])[-2]
-                print(emoji.last_used)
                 date_used = emoji.last_used.strftime('%Y-%m-%d') if emoji.last_used is not None else emoji.last_used
                 inst_increase = emoji.instance_count - self.model.db[ctx.guild.id][prior_date][emoji_id].instance_count
                 total_increase = emoji.total_count - self.model.db[ctx.guild.id][prior_date][emoji_id].total_count
 
+                inst_perc = perc(emoji.instance_count, curr_inst_sum)
+                total_perc = perc(emoji.total_count, curr_total_sum)
+
+                inst_perc_increase = inst_perc - perc(emoji.instance_count - inst_increase, prior_inst_sum)
+                total_perc_increase = total_perc - perc(emoji.total_count - total_increase, prior_total_sum)
+
+                inst_perc_increase = '{0:.2f}'.format(
+                    inst_perc_increase) if inst_perc_increase < 0 else '+{0:.2f}'.format(inst_perc_increase)
+                total_perc_increase = '{0:.2f}'.format(
+                    total_perc_increase) if total_perc_increase < 0 else '+{0:.2f}'.format(total_perc_increase)
+
                 output += str(emoji.emoji_obj) + ' : ' + \
-                          str(emoji.instance_count) + ' [ ' + str(inst_increase) + '↑] - ' + \
-                          str(emoji.total_count) + ' [ ' + str(total_increase) + '↑]    (last used: ' + \
-                          str(date_used) + ')\n'
+                          str(emoji.instance_count) + ' (+' + str(inst_increase) + ') ' + \
+                          ' - ' + '{0:.2f}'.format(inst_perc) + '% (' + inst_perc_increase + '%) • ' + \
+                          str(emoji.total_count) + ' (+' + str(total_increase) + ') ' + \
+                          ' - ' + '{0:.2f}'.format(total_perc) + '% (' + total_perc_increase + '%)' + \
+                          '   (last used: ' + str(date_used) + ')\n'
 
                 if i % 5 == 4:
                     embed.add_field(name=str(i - 3) + ' - ' + str(i + 1), value=output, inline=False)
@@ -127,13 +160,16 @@ class View(commands.Cog):
             if output is not '':
                 embed.add_field(name=str(len(msg) - (len(msg) % 5) + 1) + ' - ' + str(len(msg)), value=output,
                                 inline=False)
-            embed.set_footer(text=str(prior_date.strftime('%Y-%m-%d')) + ' to ' + str(last_date.strftime('%Y-%m-%d')))
+            str_format = 'format: [emoji]: <single count> (<single increase count>) - <single %> (<single increase %>) - ' \
+                         '<total count> (<total increase count>) - <total %> (<total increase %>)  \t'
+            embed.set_footer(
+                text=str_format + str(prior_date.strftime('%Y-%m-%d')) + ' to ' + str(curr_date.strftime('%Y-%m-%d')))
         else:
             embed = discord.Embed(title='Untitled')
             embed.add_field(name='Field 1', value=msg)
         await ctx.send(embed=embed)
 
-    async def bar(self, ctx, sort_type='instance'):
+    async def bar(self, ctx, sort_type='instance', change=False):
         """
         Creates and sends bar graph of data in descending order
         @param ctx: Discord context
@@ -146,12 +182,13 @@ class View(commands.Cog):
         temp = []  # list_vals temporary container
         WIDTH = 0.3  # bar width size
         Y_MAX = 50  # y delimiter
+        is_over_max = False
         counter = 0  # legend counter
-        NB_ENTRIES = 5
+        NB_ENTRIES = 5  # nb of date entries
 
-        last_date = list(self.model.db[ctx.guild.id])[-1]  # latest date
+        curr_date = list(self.model.db[ctx.guild.id])[-1]  # latest date
         reverse_dates = reversed(list(self.model.db[ctx.guild.id]))  # dates for stacks
-        emote_size = len(self.model.db[ctx.guild.id][last_date])  # number of emojis
+        emote_size = len(self.model.db[ctx.guild.id][curr_date])  # number of emojis
         ind = [x for x in range(emote_size)]  # list of ints to space graph
 
         # set emote font size
@@ -182,6 +219,8 @@ class View(commands.Cog):
                         temp.append(self.model.db[ctx.guild.id][date][emoji.emoji_obj.id].total_count)
                     else:
                         temp.append(self.model.db[ctx.guild.id][date][emoji.emoji_obj.id].instance_count)
+                    if temp[-1] > Y_MAX:
+                        is_over_max = True
                 # if no entry at that date, add 0
                 except KeyError as e:
                     print(e)
@@ -204,13 +243,14 @@ class View(commands.Cog):
         for i in range(len(list_vals)):
             plt.bar(ind, list_vals[i], WIDTH, bottom=0)
 
-        plt.ylim([0, Y_MAX + 10])  # y upper limit
+        if is_over_max:  # todo: might remove limiter
+            plt.ylim([0, Y_MAX + 10])  # y upper limit
         plt.xticks(ind, list_names, fontsize=text_size, rotation=90)  # x tick title values
         plt.xlabel('Emoji')  # x label
         plt.ylabel('Single instance count')  # y label
         plt.title("Bar graph of emote use in " + ctx.guild.name)  # title
         plt.legend(list_legend, loc=0)  # legend
-        
+
         fig = plt.gcf()
         plt.show()
         plt.draw()
@@ -305,9 +345,9 @@ class View(commands.Cog):
         @param sort_type: string sorting type: 'instance', 'total', 'alpha'
         @return: list (EmojiStat)
         """
-        last_date = list(self.model.db[ctx.guild.id])[-1]
+        curr_date = list(self.model.db[ctx.guild.id])[-1]
         list_emojis = []
-        for x, y in self.model.db[ctx.guild.id][last_date].items():
+        for x, y in self.model.db[ctx.guild.id][curr_date].items():
             list_emojis.append(y)
 
         # sort by instance count into list: EmojiStat
@@ -315,6 +355,10 @@ class View(commands.Cog):
             sorted_emojis = sorted(list_emojis,
                                    key=lambda kv: getattr(kv, 'instance_count'),
                                    reverse=True)
+        elif sort_type == 'instance change':
+            prior_date = list(self.model.db[ctx.guild.id])[-2]
+            pass
+
         # sort by total_count descending order
         elif sort_type == 'total':
             # sort by instance count into list: (id, EmojiStat)
