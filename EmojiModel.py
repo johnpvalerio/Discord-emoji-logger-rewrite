@@ -61,13 +61,15 @@ class Model(commands.Cog):
         firebase_admin.initialize_app(cred, {
             'databaseURL': 'https://discord-emoji-stat.firebaseio.com/'})
         ref = db.reference('')
-        self.db = self.fix_db(ref.get())
 
-        # add new guilds
+        if ref.get() is not None:
+            self.db = self.fix_db(ref.get())
+
         for guild in self.bot.guilds:
             # new database or new guild
             if self.db == {} or guild.id not in self.db:
                 await self.new_db(guild.id)
+
         print(self.db)
         print('Ready')
 
@@ -269,5 +271,6 @@ def encoder_json(file_object):
     if isinstance(file_object, EmojiStat.EmojiStat):
         return {'instance_count': file_object.instance_count,
                 'total_count': file_object.total_count,
-                'last_used': file_object.last_used.__str__()}
+                'last_used': file_object.last_used.strftime(
+                    '%Y-%m-%d %H:%M:%S.%f') if file_object.last_used is not None else 'None'}
     return None
