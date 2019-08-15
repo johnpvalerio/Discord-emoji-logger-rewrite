@@ -178,9 +178,10 @@ class View(commands.Cog):
             embed.add_field(name='Field 1', value=msg)
         await ctx.send(embed=embed)
 
-    async def bar(self, ctx, sort_type='instance_count'):
+    async def bar(self, ctx, sort_type='instance_count', is_delta=False):
         """
         Creates and sends bar graph of data in descending order
+        @param is_delta: Boolean for frequency change option
         @param ctx: Discord context
         @param sort_type: String of type (instance, total, alpha)
         @return: None
@@ -196,9 +197,17 @@ class View(commands.Cog):
         NB_ENTRIES = 5  # nb of date entries
 
         curr_date = list(self.model.db[ctx.guild.id])[-1]  # latest date
-        reverse_dates = reversed(list(self.model.db[ctx.guild.id]))  # dates for stacks
         emote_size = len(self.model.db[ctx.guild.id][curr_date])  # number of emojis
         ind = [x for x in range(emote_size)]  # list of ints to space graph
+
+        # switch for delta option
+        if is_delta:
+            reverse_dates = [curr_date]
+            past_date = list(self.model.db[ctx.guild.id])[-2]
+            sorted_emojis = self.n_sort(ctx, sort_type, curr_date, past_date)
+        else:
+            reverse_dates = reversed(list(self.model.db[ctx.guild.id]))  # dates for stacks
+            sorted_emojis = self.n_sort(ctx, sort_type, curr_date)
 
         # set emote font size
         if emote_size >= 70:
@@ -209,9 +218,6 @@ class View(commands.Cog):
             text_size = 8
         else:
             text_size = 12
-
-        # sort by desired type
-        sorted_emojis = self.n_sort(ctx, sort_type, curr_date)
 
         # add emoji names, x - values
         for emoji in sorted_emojis:
@@ -250,62 +256,10 @@ class View(commands.Cog):
             plt.ylim([0, Y_MAX + 10])  # y upper limit
         plt.xticks(ind, list_names, fontsize=text_size, rotation=90)  # x tick title values
         plt.xlabel('Emoji')  # x label
-        plt.ylabel('Single instance count')  # y label
+        plt.ylabel(sort_type)  # y label
         plt.title("Bar graph of emote use in " + ctx.guild.name)  # title
         plt.legend(list_legend, loc=0)  # legend
 
-        fig = plt.gcf()
-        plt.show()
-        plt.draw()
-        fig.savefig('graph.png', bbox_inches='tight', dpi=900)
-        await ctx.send(file=discord.File('graph.png'))
-
-    # todo: complete
-    async def bar_change(self, ctx, sort_type='instance_count'):
-        list_names = []  # x tick labels
-        list_vals = []  # y values
-        reverse_dates = reversed(list(self.model.db[ctx.guild.id]))  # dates for stacks
-        temp = []  # list_vals temporary container
-        WIDTH = 0.3  # bar width size
-        Y_MAX = 50  # y delimiter
-        curr_date = list(self.model.db[ctx.guild.id])[-1]  # latest date
-        past_date = list(self.model.db[ctx.guild.id])[-2]
-        emote_size = len(self.model.db[ctx.guild.id][curr_date])  # number of emojis
-        ind = [x for x in range(emote_size)]  # list of ints to space graph
-
-        # sorted_emojis = self.sort(ctx, sort_type)
-        sorted_emojis = self.n_sort(ctx, sort_type, curr_date, past_date)
-
-        for emoji in sorted_emojis:
-            print(emoji[0], ' - ', emoji[1], ' : ', emoji[2])
-
-        # emoji names, x - values
-        for emoji in sorted_emojis:
-            list_names.append(emoji[1])
-            if Y_MAX < emoji[2]:
-                Y_MAX = emoji[2]
-
-        # add frequency, y - values
-        for date in reverse_dates:
-            past_date = date
-            if past_date is None:
-                continue
-            for emoji in sorted_emojis:
-                try:
-                    list_vals.append(emoji[2])
-                    if list_vals[-1] > Y_MAX:
-                        is_over_max = True
-                # if no entry at that date, add 0
-                except KeyError as e:
-                    print(e)
-                    list_vals.append(0)
-
-        # add values into bar graph
-        for i in range(len(list_vals)):
-            plt.bar(ind, list_vals[i], WIDTH, bottom=0)
-
-        plt.xticks(ind, list_names, rotation=90)  # x tick title values
-        plt.xlabel('Emoji')  # x label
         fig = plt.gcf()
         plt.show()
         plt.draw()
