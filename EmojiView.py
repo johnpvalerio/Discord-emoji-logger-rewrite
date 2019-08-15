@@ -75,12 +75,13 @@ class View(commands.Cog):
         labels = []
         values = []
 
-        # sort by instance count into list: (id, EmojiStat)
-        sorted_emojis = self.sort(ctx, 'instance')
+        # sort by instance count into list
+        sorted_emojis = self.n_sort(ctx, "instance_count", list(self.model.db[ctx.guild.id])[-1])
 
+        # add labels and values
         for emoji in sorted_emojis:
-            labels.append(emoji.emoji_obj.name)
-            values.append(emoji.instance_count)
+            labels.append(emoji[1])  # emoji name
+            values.append(emoji[2])  # emoji frequency
 
         fig, ax = plt.subplots()
         ax.pie(values, labels=labels, autopct='%1.1f%%')
@@ -98,7 +99,6 @@ class View(commands.Cog):
         @return: None
         """
         # sort by instance count into list: (id, EmojiStat)
-        sorted_emojis = self.sort(ctx, 'instance')
         sorted_emojis = self.n_sort(ctx, "instance_count", list(self.model.db[ctx.guild.id])[-1])
 
         await self.embed(ctx, sorted_emojis)
@@ -115,7 +115,6 @@ class View(commands.Cog):
                      '<total count> (<total increase count>) - <total %> (<total increase %>)  \t'
         # msg is emojistat objects sorted by instance
         if type(msg) is list:
-
             output = ''
             embed = discord.Embed(title=ctx.guild.name + '\'s emoji stats')
             embed.set_thumbnail(url=str(ctx.guild.icon_url))
@@ -226,9 +225,13 @@ class View(commands.Cog):
                 Y_MAX = emoji[2]
         # add frequency, y - values
         for date in reverse_dates:
+            print(date)
             for emoji in sorted_emojis:
                 try:
-                    temp.append(emoji[2])
+                    if is_delta:
+                        temp.append(emoji[2])
+                    else:
+                        temp.append(getattr(self.model.db[ctx.guild.id][date][emoji[0]], sort_type))
                     if temp[-1] > Y_MAX:
                         is_over_max = True
                 # if no entry at that date, add 0
@@ -242,12 +245,13 @@ class View(commands.Cog):
                 temp = []
                 counter += 1
 
-        # formats bar values such that only latest values are applied and not overwritten by old ones
-        for list_index in reversed(range(len(list_vals))):
-            for entry_index in range(len(list_vals[list_index])):
-                if list_vals[list_index][entry_index] == list_vals[list_index - 1][entry_index]:
-                    list_vals[list_index][entry_index] = 0
-
+        if not is_delta:
+            # formats bar values such that only latest values are applied and not overwritten by old ones
+            for list_index in reversed(range(len(list_vals))):
+                for entry_index in range(len(list_vals[list_index])):
+                    if list_vals[list_index][entry_index] == list_vals[list_index - 1][entry_index]:
+                        list_vals[list_index][entry_index] = 0
+        print(list_vals)
         # add values into bar graph
         for i in range(len(list_vals)):
             plt.bar(ind, list_vals[i], WIDTH, bottom=0)
@@ -346,61 +350,6 @@ class View(commands.Cog):
         plt.draw()
         fig.savefig('graph.png', bbox_inches='tight')
         await ctx.send(file=discord.File('graph.png'))
-
-    def sort(self, ctx, sort_type):
-        """
-        Creates a sorted copy of the data of the latest date as a list
-        @param ctx: Discord context
-        @param sort_type: string sorting type: 'instance', 'total', 'alpha'
-        @return: list (EmojiStat)
-        """
-        curr_date = list(self.model.db[ctx.guild.id])[-1]
-        list_emojis = []
-        for x, y in self.model.db[ctx.guild.id][curr_date].items():
-            print(y)
-            list_emojis.append(y)
-
-        # sort by instance count into list: EmojiStat
-        if sort_type == 'instance':
-            sorted_emojis = sorted(list_emojis,
-                                   key=lambda kv: getattr(kv, 'instance_count'),
-                                   reverse=True)
-        # todo: do sorting of values
-        elif sort_type == 'instance change':
-            prior_date = list(self.model.db[ctx.guild.id])[-2]
-            temp = {}
-            for emoji in list_emojis:
-                temp[emoji.emoji_obj.id] = self.model.db[ctx.guild.id][curr_date][emoji.emoji_obj.id].instance_count - \
-                                           self.model.db[ctx.guild.id][prior_date][emoji.emoji_obj.id].instance_count
-                print(emoji.emoji_obj.id, ' - ', temp[emoji.emoji_obj.id])
-
-            sorted_emojis = sorted(temp.items(), key=lambda kv: kv[0])
-        # sort by total_count descending order
-        elif sort_type == 'total':
-            # sort by instance count into list: (id, EmojiStat)
-            sorted_emojis = sorted(list_emojis,
-                                   key=lambda kv: getattr(kv, 'total_count'),
-                                   reverse=True)
-        elif sort_type == 'total change':
-            prior_date = list(self.model.db[ctx.guild.id])[-2]
-            sorted_emojis = {}
-            for emoji in list_emojis:
-                sorted_emojis[emoji.emoji_obj.id] = self.model.db[ctx.guild.id][curr_date][
-                                                        emoji.emoji_obj.id].total_count - \
-                                                    self.model.db[ctx.guild.id][prior_date][
-                                                        emoji.emoji_obj.id].total_count
-
-        # sort by emoji's name alphabetical order
-        elif sort_type == 'alpha':
-            sorted_emojis = sorted(list_emojis,
-                                   key=lambda kv: getattr(kv.emoji_obj, 'name'),
-                                   reverse=False)
-        # default to sorting by instance
-        else:
-            sorted_emojis = sorted(list_emojis,
-                                   key=lambda kv: getattr(kv, 'instance_count'),
-                                   reverse=True)
-        return sorted_emojis
 
     def n_sort(self, ctx, sort_type, date1, date2=None):
         '''
