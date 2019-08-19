@@ -57,7 +57,7 @@ class Model(commands.Cog):
         sets up database on initialization
         @return: None
         """
-        cred = credentials.Certificate('firebase_admin.json')
+        cred = credentials.Certificate('configs/firebase_admin.json')
         firebase_admin.initialize_app(cred, {
             'databaseURL': 'https://discord-emoji-stat.firebaseio.com/'})
         ref = db.reference('')
@@ -120,7 +120,6 @@ class Model(commands.Cog):
         await self.log_emoji(channel=channel, date_after=start_date,
                              date_stop=datetime.datetime.now(), date_list=date_list)
 
-    # todo: use msg date created as keys
     # compile emoji in all channels between given dates
     async def log_emoji(self, channel, date_after, date_stop, date_list):
         """

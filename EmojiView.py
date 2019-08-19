@@ -89,8 +89,8 @@ class View(commands.Cog):
         fig = plt.gcf()
         plt.show()
         plt.draw()
-        fig.savefig('pie.png')
-        await ctx.send(file=discord.File('pie.png'))
+        fig.savefig('resources/pie.png')
+        await ctx.send(file=discord.File('resources/pie.png'))
 
     async def table(self, ctx):
         """
@@ -267,8 +267,8 @@ class View(commands.Cog):
         fig = plt.gcf()
         plt.show()
         plt.draw()
-        fig.savefig('graph.png', bbox_inches='tight', dpi=900)
-        await ctx.send(file=discord.File('graph.png'))
+        fig.savefig('resources/graph.png', bbox_inches='tight', dpi=900)
+        await ctx.send(file=discord.File('resources/graph.png'))
 
     # todo: legend ordering, ignore 0's (twitch emotes)
     async def graph(self, ctx):
@@ -330,10 +330,10 @@ class View(commands.Cog):
                 url_link = url[i]
                 async with session.get(url_link) as resp:
                     if resp.status == 200:
-                        f = await aiofiles.open('emoji.png', mode='wb')
+                        f = await aiofiles.open('resources/emoji.png', mode='wb')
                         await f.write(await resp.read())
                         await f.close()
-                        img.append(HandlerLineImage('emoji.png'))
+                        img.append(HandlerLineImage('resources/emoji.png'))
         legend_obj = dict(zip(lines, img))
 
         # makes columns of size 10
@@ -348,8 +348,8 @@ class View(commands.Cog):
         fig.autofmt_xdate()  # might delete
         plt.show()
         plt.draw()
-        fig.savefig('graph.png', bbox_inches='tight')
-        await ctx.send(file=discord.File('graph.png'))
+        fig.savefig('resources/graph.png', bbox_inches='tight')
+        await ctx.send(file=discord.File('resources/graph.png'))
 
     def n_sort(self, ctx, sort_type, date1, date2=None):
         '''
