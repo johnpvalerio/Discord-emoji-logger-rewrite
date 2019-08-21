@@ -352,14 +352,14 @@ class View(commands.Cog):
         await ctx.send(file=discord.File('resources/graph.png'))
 
     def n_sort(self, ctx, sort_type, date1, date2=None):
-        '''
+        """
         Sorts db entry at given date by sort type
         @param ctx: Discord context
         @param sort_type: String "instance_count", "total_count"
         @param date1: Datetime latest date
         @param date2: Datetime past date
         @return: List (Int emoji ID, String emoji name, Int frequency)
-        '''
+        """
         sorted_emojis = []
         cur_emojis = self.model.db[ctx.guild.id][date1]
         for emoji in cur_emojis.values():
