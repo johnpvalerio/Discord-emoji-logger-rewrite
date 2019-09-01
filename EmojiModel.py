@@ -163,6 +163,7 @@ class Model(commands.Cog):
 
             # update emoji counts
             for emoji in set(emoji_found):
+                self.logger.debug('Updating entry: ' + emoji)
                 emoji_count = emoji_found.count(emoji)
                 self.update_data(guild_id=channel.guild.id, date_list=date_list[date_index:],
                                  emoji_id=int(emoji[-19:-1]), inst_inc=1, total_inc=emoji_count,
@@ -179,7 +180,7 @@ class Model(commands.Cog):
         @param date_used: datetime last time emoji was used
         @return: None
         """
-        self.logger.debug('UPDATE ENTRY')
+        # self.logger.debug('UPDATE ENTRY')
         for date in date_list:
             self.db[guild_id][date][emoji_id].instance_count += inst_inc
             self.db[guild_id][date][emoji_id].total_count += total_inc
@@ -219,17 +220,20 @@ class Model(commands.Cog):
 
     def export(self, guild_id):
         self.logger.debug('SAVING')
+        self.logger.debug(guild_id)
         temp_db = {}
-        for guild_id, date_key in self.db.items():
-            temp_db[guild_id] = {}
-            for date in self.db[guild_id]:
-                temp_db[guild_id][date.strftime('%Y-%m-%d %H:%M:%S')] = self.db[guild_id][date]
+        for g_id, date_key in self.db.items():
+            temp_db[g_id] = {}
+            for date in self.db[g_id]:
+                temp_db[g_id][date.strftime('%Y-%m-%d %H:%M:%S')] = self.db[g_id][date]
         with open('emoji-data.json', 'w', encoding='utf-8') as write_file:
             json.dump(temp_db, write_file, indent=2, default=encoder_json)
         # export to firebase
         with open('emoji-data.json', 'r', encoding='utf-8') as read_file:
-            ref = db.reference(str(guild_id))
-            ref.update(json.load(read_file)[str(guild_id)])
+            server_id = str(guild_id)
+            self.logger.debug('Saving to firebase -  server ID: ' + server_id)
+            ref = db.reference(server_id)
+            ref.update(json.load(read_file)[server_id])
         self.logger.debug('Save complete')
 
     def fix_db(self, database):
