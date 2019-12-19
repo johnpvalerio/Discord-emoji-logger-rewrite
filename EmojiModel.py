@@ -37,7 +37,6 @@ def next_dates(start_date):
         # print('now: ', datetime.datetime.now(), ' - current: ', start_date)
         date_list.append(start_date)
 
-    # print(date_list[:-1])
     return date_list[:-1]
 
 
@@ -79,7 +78,7 @@ class Model(commands.Cog):
         self.db[guild_id] = {}
         await self.prepare_db(guild_id)
 
-    # note: emoji dates added isnt reflected in data logged
+    # note: emoji dates added isn't reflected in data logged
     async def prepare_db(self, guild_id, start_date=None):
         """
         Sets database db to contain date & server emojis
@@ -87,6 +86,7 @@ class Model(commands.Cog):
         @param start_date: starting date to initialize datetime
         @return: None
         """
+        # get list of dates
         # start from beginning
         if start_date is None:
             date_list = next_dates(self.bot.get_guild(guild_id).created_at)
@@ -96,6 +96,21 @@ class Model(commands.Cog):
         # add emojis
         for date in date_list:
             self.db[guild_id][date] = await self.compile_emoji(guild_id)
+
+    async def log_helper(self, member, t_channels, last_date, guild_id, is_new, index=None):
+        for current_channel in list(filter(lambda channel:
+                                           channel.permissions_for(member).read_messages,
+                                           t_channels)):
+            if is_new:
+                await self.log_channel(current_channel)
+            else:
+                await self.log_channel(current_channel, last_date)
+
+        # add old entries to newly counted
+        if not is_new:
+            list_date = list(self.db[guild_id])
+            for i in range(index + 1, len(list_date)):
+                self.merge_entry(guild_id, list_date[i], list_date[index])
 
     async def log_channel(self, channel, start_date=None):
         """
@@ -153,8 +168,7 @@ class Model(commands.Cog):
             # remove emojis not from guild
             emoji_found = list(
                 filter(lambda cur_emoji:
-                       cur_emoji in list(str(emoji_server)
-                                         for emoji_server in channel.guild.emojis
+                       cur_emoji in list(str(emoji_server) for emoji_server in channel.guild.emojis
                                          if not emoji_server.managed),
                        emoji_found))
             # no emoji from guild, skip

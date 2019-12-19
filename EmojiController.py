@@ -1,3 +1,5 @@
+import logging
+
 from discord.ext import commands
 
 
@@ -6,7 +8,8 @@ class Controller(commands.Cog):
         self.model = model
         self.view = view
         self.bot = bot
-        print('Controller ON')
+        self.logger = logging.getLogger('bot_logs')
+        self.logger.info('Controller ON')
 
     @commands.command()
     async def me(self, ctx, args):
@@ -17,13 +20,11 @@ class Controller(commands.Cog):
         @param args: String user input argument
         @return: None
         """
-        print("\n--------------------------")
-        print('[COMMAND] - me()')
-        print("--------------------------")
+        self.logger.info('[command] - me()')
         str_output = ''
         for word in args:
             str_output += '**' + word + '**' + ' '
-        print(str_output)
+        self.logger.debug(str_output)
         await self.view.print(ctx, str_output)
 
     @commands.command()
@@ -35,40 +36,26 @@ class Controller(commands.Cog):
         @param args: List user input arguments
         @return: None
         """
-        print("\n--------------------------")
-        print('[COMMAND] - log()')
-        print("--------------------------")
-        print(args)
+        self.logger.info('[COMMAND] - log()')
+        self.logger.debug(args)
         # log from last compiled
-        list_date = list(self.model.db[ctx.guild.id])
-        last_date = list_date[-1]
+        list_date = list(self.model.db[ctx.guild.id])  # get dates from given ID
+        last_date = list_date[-1]  # get latest entry
+
+        # continue from last
         if args == ():
-            args = ''
             last_date_index = len(list_date) - 1
             await self.model.prepare_db(ctx.guild.id, last_date)
+            await self.model.log_helper(ctx.guild.me, ctx.guild.text_channels, last_date,
+                                        index=last_date_index, guild_id=ctx.guild.id, is_new=False)
         # log from the start
         elif 'n' in args or 'new' in args:
-            args = 'n'
             await self.model.new_db(ctx.guild.id)
+            await self.model.log_helper(ctx.guild.me, ctx.guild.text_channels, last_date,
+                                        guild_id=ctx.guild.id, is_new=True)
         # default do nothing
         else:
             return
-
-        # log emojis in bot viewable channels
-        for current_channel in list(filter(lambda channel:
-                                           channel.permissions_for(ctx.guild.me).read_messages,
-                                           ctx.guild.text_channels)):
-            # log new from start
-            if args in ['n', 'new']:
-                await self.model.log_channel(current_channel)
-            # log from last saved
-            else:
-                await self.model.log_channel(current_channel, last_date)
-        # fix new entry
-        if args == '':
-            list_date = list(self.model.db[ctx.guild.id])
-            for i in range(last_date_index+1, len(list_date)):
-                self.model.merge_entry(ctx.guild.id, list_date[i], list_date[last_date_index])
         await self.view.db(ctx)
 
     @commands.command()
@@ -79,14 +66,12 @@ class Controller(commands.Cog):
         @param args: List user input arguments
         @return: None
         """
-        print("\n--------------------------")
-        print('[COMMAND] - re()')
-        print("--------------------------")
-        print(args)
+        self.logger.info('[COMMAND] - re()')
+        self.logger.debug(args)
         msg = ' '.join(args)
         await self.view.print(ctx, msg)
 
-    @commands.command('exp')
+    @commands.command(aliases=['exp', 'save'])
     @commands.has_permissions(manage_guild=True)
     async def export(self, ctx):
         """
@@ -94,22 +79,19 @@ class Controller(commands.Cog):
         @param ctx: Discord context
         @return: None
         """
-        print("\n--------------------------")
-        print('[COMMAND] - exp()')
-        print("--------------------------")
+        self.logger.info('[COMMAND] - exp()')
+        self.logger.debug(ctx.guild.id)
         self.model.export(ctx.guild.id)
         await self.view.print(ctx, 'done')
 
-    @commands.command('graph')
+    @commands.command(aliases=['graph'])
     async def plot(self, ctx):
         """
         Creates time series graph, calls model for creation
         @param ctx: Discord context
         @return: None
         """
-        print("\n--------------------------")
-        print('[COMMAND] - graph()')
-        print("--------------------------")
+        self.logger.info('[COMMAND] - graph()')
         await self.view.graph(ctx)
 
     @commands.command('pie')
@@ -119,9 +101,7 @@ class Controller(commands.Cog):
         @param ctx: Discord context
         @return: None
         """
-        print("\n--------------------------")
-        print('[COMMAND] - pie()')
-        print("--------------------------")
+        self.logger.info('[COMMAND] - pie()')
         await self.view.pie(ctx)
 
     @commands.command()
@@ -131,9 +111,7 @@ class Controller(commands.Cog):
         @param ctx: Discord context
         @return: None
         """
-        print("\n--------------------------")
-        print('[COMMAND] - table()')
-        print("--------------------------")
+        self.logger.info('[COMMAND] - table()')
         await self.view.table(ctx)
 
     @commands.command('emb')
@@ -144,13 +122,12 @@ class Controller(commands.Cog):
         @param args: List user input arguments
         @return: None
         """
-        print("\n--------------------------")
-        print('[COMMAND] - embed()')
-        print("--------------------------")
+        self.logger.info('[COMMAND] - embed()')
         msg = ' '.join(args)
-        print(msg)
+        self.logger.debug(msg)
         await self.view.embed(ctx, msg)
 
+    # todo: clean up argument use with extra args input
     @commands.command()
     async def bar(self, ctx, *arg):
         """
@@ -161,11 +138,26 @@ class Controller(commands.Cog):
         @param arg: list user input arguments
         @return: None
         """
-        print("\n--------------------------")
-        print('[COMMAND] - bar()')
-        print("--------------------------")
+        self.logger.info('[COMMAND] - bar()')
         if arg:
             arg = arg[0]
             await self.view.bar(ctx, arg)
         else:
             await self.view.bar(ctx)
+
+    @commands.command('bch')
+    async def bar_change(self, ctx, *arg):
+        """
+        Creates stacked bar graph of db data values of change from prior month, calls model for creation
+        If no arguments, calls default format (instance)
+        else, uses desired type: instance or total
+        @param ctx: Discord context
+        @param arg: list user input arguments
+        @return: None
+        """
+        self.logger.info('[COMMAND] - bar_change()')
+        if arg:
+            arg = arg[0]
+            await self.view.bar(ctx, arg)
+        else:
+            await self.view.bar(ctx, is_delta=True)
