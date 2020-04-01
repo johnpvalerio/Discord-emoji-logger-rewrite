@@ -7,6 +7,15 @@ import EmojiController
 import EmojiModel
 import EmojiView
 
+'''
+Permissions required:
+    Read text channels and see voice channels
+    send messages
+    embed links
+    read message history
+    add reactions
+    manage messages (remove reactions)
+'''
 
 def main():
     # logging.basicConfig(filename='configs/bot.log', level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -18,10 +27,10 @@ def main():
     fh_log.setFormatter(formatter)
     logger.addHandler(stm_log)
     logger.addHandler(fh_log)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
 
     logger.info("AegisBot initializing")
-    bot = commands.Bot(command_prefix='!')
+    bot = commands.Bot(command_prefix='!', case_insensitive=True)
 
     model = EmojiModel.Model(bot)
     view = EmojiView.View(model, bot)
