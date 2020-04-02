@@ -1,3 +1,6 @@
+import asyncio
+import logging
+
 import aiofiles as aiofiles
 import aiohttp
 import discord
@@ -34,12 +37,16 @@ def perc(val, total):
     return val / total * 100
 
 
+def format_value(emoji, count):
+    return str(emoji) + ' ' + str(count)
+
+
 class View(commands.Cog):
     def __init__(self, model, bot):
         self.model = model
         self.bot = bot
-
-        print('View ON')
+        self.logger = logging.getLogger('bot_logs')
+        self.logger.info('View ON')
 
     async def print(self, ctx, msg):
         """
@@ -364,12 +371,101 @@ class View(commands.Cog):
         cur_emojis = self.model.db[ctx.guild.id][date1]
         for emoji in cur_emojis.values():
             if date2 is not None:
-                sorted_emojis.append([emoji.emoji_obj.id, emoji.emoji_obj.name, getattr(emoji, sort_type) - getattr(
-                    self.model.db[ctx.guild.id][date2][emoji.emoji_obj.id], sort_type)])
+                sorted_emojis.append([emoji.emoji_obj.id, emoji.emoji_obj.name, getattr(emoji, sort_type) -
+                                      getattr(self.model.db[ctx.guild.id][date2][emoji.emoji_obj.id], sort_type)])
             else:
                 sorted_emojis.append([emoji.emoji_obj.id, emoji.emoji_obj.name, getattr(emoji, sort_type)])
         sorted_emojis = sorted(sorted_emojis, key=lambda kv: kv[2], reverse=True)
         return sorted_emojis
+
+    def emoji_sort(self, ctx, sort_type, cur_date, old_date=None):
+        sorted_emojis = []
+        cur_emojis = self.model.db[ctx.guild.id][cur_date]
+        for emoji in cur_emojis.values():
+            if old_date is not None:
+                sorted_emojis.append((emoji.emoji_obj, getattr(emoji, sort_type) -
+                                      getattr(self.model.db[ctx.guild.id][old_date][emoji.emoji_obj.id], sort_type)))
+            else:
+                sorted_emojis.append((emoji.emoji_obj, getattr(emoji, sort_type)))
+        sorted_emojis = sorted(sorted_emojis, key=lambda kv: kv[1], reverse=True)
+        return sorted_emojis
+
+    # test for pages with reactions
+    async def embed_tests(self, ctx, page=0, msg=None):
+        PAGE_LEN = 10  # how many total entries from all groups
+        GROUP_LEN = 6  # how many entries per group
+        sorted_emojis = self.emoji_sort(ctx, "instance_count", list(self.model.db[ctx.guild.id])[-1])
+        sorted_emojis += sorted_emojis
+        sorted_emojis += sorted_emojis
+
+        def embed_maker(_page=0):
+            """
+            Creates a Discord embed object
+            Formats as a table with number of entries given
+            @param _page: Int current page
+            @return: Discord embed object
+            """
+            val = ''
+            embed = discord.Embed(title='this is a test')
+
+            embed.set_footer(text='page ' + str(_page + 1) + '/ ' + str(int(len(sorted_emojis) / PAGE_LEN) + 1))
+
+            MAX_RANGE = PAGE_LEN \
+                if (PAGE_LEN * int(_page) + PAGE_LEN <= len(sorted_emojis)) \
+                else len(sorted_emojis) - PAGE_LEN * int(_page)
+
+            if MAX_RANGE < 0 or _page < 0:
+                return
+
+            print('-----')
+            for i in range(MAX_RANGE):
+                emoji, count = sorted_emojis[i + int(_page) * PAGE_LEN]  # get emoji and count info
+                val += format_value(emoji, count) + '\n'  # get value to display
+                if i % GROUP_LEN != GROUP_LEN - 1 and \
+                        i != MAX_RANGE - 1:  # keep going until GROUP_LEN number of entries per field
+                    continue  # or last entry
+
+                # add into field
+                str_title = str(i + 1 - i % GROUP_LEN + int(_page) * PAGE_LEN) + \
+                            '-' + str(i + 1 + int(_page) * PAGE_LEN)
+                embed.add_field(name=str_title, value=val, inline=False)
+                val = ''
+            return embed
+
+        # send new embed message
+        if msg is None:
+            msg = await ctx.send(embed=embed_maker(page))
+        # edit current embed message
+        else:
+            await msg.edit(embed=embed_maker(page))
+
+        # add reaction buttons
+        if page != 0:
+            await msg.add_reaction('\u23ea')  # <<
+        if page != int(len(sorted_emojis) / PAGE_LEN):
+            await msg.add_reaction('\u23e9')  # >>
+
+        async def clear():
+            """
+            removes all reactions
+            @return: NOne
+            """
+            await msg.clear_reactions()
+
+        # waiting for reaction << or >>
+        def a(reaction_, user_):
+            return (str(reaction_.emoji) == '\u23ea' or str(reaction_.emoji) == '\u23e9') and user_ == ctx.author
+
+        try:
+            reaction, user = await ctx.bot.wait_for('reaction_add', timeout=10.0, check=a)
+        except asyncio.TimeoutError:  # false - no valid emoji [<<, >>]
+            await clear()
+        else:  # true
+            await clear()
+            if reaction.emoji == u'\u23ea':
+                await self.embed_tests(ctx, page - 1, msg)
+            elif reaction.emoji == u'\u23e9':
+                await self.embed_tests(ctx, page + 1, msg)
 
 
 class HandlerLineImage(HandlerBase):
