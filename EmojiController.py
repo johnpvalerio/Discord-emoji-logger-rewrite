@@ -105,27 +105,15 @@ class Controller(commands.Cog):
         await self.view.pie(ctx)
 
     @commands.command()
-    async def table(self, ctx):
+    async def table(self, ctx, *args):
         """
         Creates table of all values formatted in descending order, calls model for creation
         @param ctx: Discord context
         @return: None
         """
         self.logger.info('[COMMAND] - table()')
-        await self.view.table(ctx)
+        await self.view.table(ctx, 0 if args == () else int(args[0]) - 1)
 
-    @commands.command('emb')
-    async def embed(self, ctx, *args):
-        """
-        Creates embedded message of user input, calls model for creation using default values
-        @param ctx: Discord context
-        @param args: List user input arguments
-        @return: None
-        """
-        self.logger.info('[COMMAND] - embed()')
-        msg = ' '.join(args)
-        self.logger.debug(msg)
-        await self.view.embed(ctx, msg)
 
     # todo: clean up argument use with extra args input
     @commands.command()

@@ -34,11 +34,12 @@ def bottom_calc(list_items):
 def perc(val, total):
     if total == 0:
         return 0
-    return val / total * 100
+    return round(val / total * 100, 2)
 
 
-def format_value(emoji, count):
-    return str(emoji) + ' ' + str(count)
+def format_value(emoji, count, total):
+    return str(emoji.emoji_obj) + ': **' + str(count) + '** (' + str(perc(count, total)) + '%) | ' + \
+           emoji.emoji_obj.created_at.strftime('%Y-%m-%d')
 
 
 class View(commands.Cog):
@@ -99,90 +100,6 @@ class View(commands.Cog):
         fig.savefig('resources/pie.png')
         await ctx.send(file=discord.File('resources/pie.png'))
 
-    async def table(self, ctx):
-        """
-        Create and send embedded message of latest data values in descending order
-        @param ctx: Discord context
-        @return: None
-        """
-        # sort by instance count into list: (id, EmojiStat)
-        sorted_emojis = self.n_sort(ctx, "instance_count", list(self.model.db[ctx.guild.id])[-1])
-
-        await self.embed(ctx, sorted_emojis)
-
-    async def embed(self, ctx, msg):
-        """
-        Creates and sends embedded message
-        @param ctx: Discord context
-        @param msg: Display content
-        @return: None
-        """
-        str_format = 'format: [emoji]: <single count> (<single increase count>) - <single %> (<single increase ' \
-                     '%>) - ' \
-                     '<total count> (<total increase count>) - <total %> (<total increase %>)  \t'
-        # msg is emojistat objects sorted by instance
-        if type(msg) is list:
-            output = ''
-            embed = discord.Embed(title=ctx.guild.name + '\'s emoji stats')
-            embed.set_thumbnail(url=str(ctx.guild.icon_url))
-
-            curr_date = list(self.model.db[ctx.guild.id])[-1]
-            prior_date = list(self.model.db[ctx.guild.id])[-2]
-
-            curr_inst_sum = sum([x.instance_count for x in msg])
-            curr_total_sum = sum([x.total_count for x in msg])
-            prior_inst_sum = sum(
-                self.model.db[ctx.guild.id][prior_date][y].instance_count for y in [x.emoji_obj.id for x in msg])
-            prior_total_sum = sum(
-                self.model.db[ctx.guild.id][prior_date][y].total_count for y in [x.emoji_obj.id for x in msg])
-
-            # iterate through emojis
-            for i in range(len(msg)):
-                emoji = msg[i]
-                emoji_id = msg[i].emoji_obj.id
-                date_used = emoji.last_used.strftime('%Y-%m-%d') if emoji.last_used is not None else '/'
-                inst_increase = emoji.instance_count - self.model.db[ctx.guild.id][prior_date][emoji_id].instance_count
-                total_increase = emoji.total_count - self.model.db[ctx.guild.id][prior_date][emoji_id].total_count
-
-                inst_perc = perc(emoji.instance_count, curr_inst_sum)
-                total_perc = perc(emoji.total_count, curr_total_sum)
-
-                inst_perc_increase = inst_perc - perc(emoji.instance_count - inst_increase, prior_inst_sum)
-                total_perc_increase = total_perc - perc(emoji.total_count - total_increase, prior_total_sum)
-
-                inst_perc_increase = '{0:.2f}'.format(
-                    inst_perc_increase) if inst_perc_increase < 0 else '+{0:.2f}'.format(inst_perc_increase)
-                total_perc_increase = '{0:.2f}'.format(
-                    total_perc_increase) if total_perc_increase < 0 else '+{0:.2f}'.format(total_perc_increase)
-
-                output += str(emoji.emoji_obj) + ': ' + \
-                          str(emoji.instance_count) + ' (+' + str(inst_increase) + ')' + \
-                          ' - ' + '{0:.2f}'.format(inst_perc) + '% (' + inst_perc_increase + '%) • ' + \
-                          str(emoji.total_count) + ' (+' + str(total_increase) + ')' + \
-                          ' - ' + '{0:.2f}'.format(total_perc) + '% (' + total_perc_increase + '%)\n'
-                # ' [' + str(date_used) + ']\n'
-                if i % 5 == 4:
-                    embed.add_field(name=str(i - 3) + ' - ' + str(i + 1), value=output, inline=False)
-                    print(str(i - 3) + ' - ' + str(i + 1))
-                    print(output)
-                    print('\t - - -')
-                    output = ''
-                    if len(embed.fields) > 10:
-                        break
-
-            if output is not '':
-                embed.add_field(name=str(len(msg) - (len(msg) % 5) + 1) + ' - ' + str(len(msg)), value=output,
-                                inline=False)
-                print(str(len(msg) - (len(msg) % 5) + 1) + ' - ' + str(len(msg)))
-                print(output)
-                print('\t - - -')
-
-            embed.set_footer(
-                text=str_format + str(prior_date.strftime('%Y-%m-%d')) + ' to ' + str(curr_date.strftime('%Y-%m-%d')))
-        else:
-            embed = discord.Embed(title='Untitled')
-            embed.add_field(name='Field 1', value=msg)
-        await ctx.send(embed=embed)
 
     async def bar(self, ctx, sort_type='instance_count', is_delta=False):
         """
@@ -379,6 +296,14 @@ class View(commands.Cog):
         return sorted_emojis
 
     def emoji_sort(self, ctx, sort_type, cur_date, old_date=None):
+        """
+        Sorts db entries at given date by sort type
+        @param ctx: Discord context
+        @param sort_type: String "instance_count", "total_count"
+        @param cur_date: Datetime of latest date
+        @param old_date: Datetime of past date
+        @return: list (Emoji object, count)
+        """
         sorted_emojis = []
         cur_emojis = self.model.db[ctx.guild.id][cur_date]
         for emoji in cur_emojis.values():
@@ -386,17 +311,27 @@ class View(commands.Cog):
                 sorted_emojis.append((emoji.emoji_obj, getattr(emoji, sort_type) -
                                       getattr(self.model.db[ctx.guild.id][old_date][emoji.emoji_obj.id], sort_type)))
             else:
-                sorted_emojis.append((emoji.emoji_obj, getattr(emoji, sort_type)))
+                sorted_emojis.append((emoji, getattr(emoji, sort_type)))
         sorted_emojis = sorted(sorted_emojis, key=lambda kv: kv[1], reverse=True)
         return sorted_emojis
 
     # test for pages with reactions
-    async def embed_tests(self, ctx, page=0, msg=None):
+    async def table(self, ctx, page=0, msg=None):
+        """
+        Creates an embed of emoji info then sends it
+        waits for emoji reaction response to change page
+        @param ctx: Discord context object
+        @param page: page to display
+        @param msg: Discord Message object - edit if present
+                    None - no Message object made
+        @return: None
+        """
         PAGE_LEN = 10  # how many total entries from all groups
-        GROUP_LEN = 6  # how many entries per group
+        GROUP_LEN = 5  # how many entries per group
+        TIMEOUT_WAIT = 10  # timer for how long to wait for reaction
+
         sorted_emojis = self.emoji_sort(ctx, "instance_count", list(self.model.db[ctx.guild.id])[-1])
-        sorted_emojis += sorted_emojis
-        sorted_emojis += sorted_emojis
+        total_count = sum([x[1] for x in sorted_emojis])
 
         def embed_maker(_page=0):
             """
@@ -406,8 +341,9 @@ class View(commands.Cog):
             @return: Discord embed object
             """
             val = ''
-            embed = discord.Embed(title='this is a test')
 
+            embed = discord.Embed(title=ctx.guild.name + '\'s emoji stats')
+            embed.set_thumbnail(url=str(ctx.guild.icon_url))
             embed.set_footer(text='page ' + str(_page + 1) + '/ ' + str(int(len(sorted_emojis) / PAGE_LEN) + 1))
 
             MAX_RANGE = PAGE_LEN \
@@ -417,10 +353,10 @@ class View(commands.Cog):
             if MAX_RANGE < 0 or _page < 0:
                 return
 
-            print('-----')
             for i in range(MAX_RANGE):
                 emoji, count = sorted_emojis[i + int(_page) * PAGE_LEN]  # get emoji and count info
-                val += format_value(emoji, count) + '\n'  # get value to display
+
+                val += format_value(emoji, count, total_count) + '\n'  # get value to display
                 if i % GROUP_LEN != GROUP_LEN - 1 and \
                         i != MAX_RANGE - 1:  # keep going until GROUP_LEN number of entries per field
                     continue  # or last entry
@@ -448,24 +384,25 @@ class View(commands.Cog):
         async def clear():
             """
             removes all reactions
-            @return: NOne
+            @return: None
             """
             await msg.clear_reactions()
 
         # waiting for reaction << or >>
-        def a(reaction_, user_):
+        def react(reaction_, user_):
             return (str(reaction_.emoji) == '\u23ea' or str(reaction_.emoji) == '\u23e9') and user_ == ctx.author
 
+        # get reaction
         try:
-            reaction, user = await ctx.bot.wait_for('reaction_add', timeout=10.0, check=a)
+            reaction, user = await ctx.bot.wait_for('reaction_add', timeout=TIMEOUT_WAIT, check=react)
         except asyncio.TimeoutError:  # false - no valid emoji [<<, >>]
             await clear()
         else:  # true
             await clear()
-            if reaction.emoji == u'\u23ea':
-                await self.embed_tests(ctx, page - 1, msg)
-            elif reaction.emoji == u'\u23e9':
-                await self.embed_tests(ctx, page + 1, msg)
+            if reaction.emoji == u'\u23ea':  # next page
+                await self.table(ctx, page - 1, msg)
+            elif reaction.emoji == u'\u23e9':  # previous page
+                await self.table(ctx, page + 1, msg)
 
 
 class HandlerLineImage(HandlerBase):
