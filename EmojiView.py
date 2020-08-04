@@ -1,7 +1,8 @@
 import asyncio
 import logging
+from datetime import datetime
 
-import aiofiles as aiofiles
+import aiofiles
 import aiohttp
 import discord
 import matplotlib.lines
@@ -39,7 +40,8 @@ def perc(val, total):
 
 def format_value(emoji, count, total):
     return str(emoji.emoji_obj) + ': **' + str(count) + '** (' + str(perc(count, total)) + '%) | ' + \
-           emoji.emoji_obj.created_at.strftime('%Y-%m-%d')
+           emoji.emoji_obj.created_at.strftime('%Y-%m-%d') + \
+           ' (' + str((datetime.now() - emoji.emoji_obj.created_at).days) + ' days)'
 
 
 class View(commands.Cog):
@@ -64,8 +66,6 @@ class View(commands.Cog):
         @param ctx: Discord context
         @return: None
         """
-        print(self.model.db)
-
         for date, val2 in self.model.db[ctx.guild.id].items():
             print(date)
             for emoji_ID, emoji_obj in self.model.db[ctx.guild.id][date].items():
@@ -84,12 +84,13 @@ class View(commands.Cog):
         values = []
 
         # sort by instance count into list
-        sorted_emojis = self.n_sort(ctx, "instance_count", list(self.model.db[ctx.guild.id])[-1])
+        sorted_emojis = self.emoji_sort(ctx, "instance_count", list(self.model.db[ctx.guild.id])[-1])
 
         # add labels and values
         for emoji in sorted_emojis:
-            labels.append(emoji[1])  # emoji name
-            values.append(emoji[2])  # emoji frequency
+            emote, count = emoji
+            labels.append(emote.emoji_obj.name)  # emoji name
+            values.append(count)  # emoji frequency
 
         fig, ax = plt.subplots()
         ax.pie(values, labels=labels, autopct='%1.1f%%')
@@ -99,7 +100,6 @@ class View(commands.Cog):
         plt.draw()
         fig.savefig('resources/pie.png')
         await ctx.send(file=discord.File('resources/pie.png'))
-
 
     async def bar(self, ctx, sort_type='instance_count', is_delta=False):
         """
@@ -127,10 +127,11 @@ class View(commands.Cog):
         if is_delta:
             reverse_dates = [curr_date]
             past_date = list(self.model.db[ctx.guild.id])[-2]
-            sorted_emojis = self.n_sort(ctx, sort_type, curr_date, past_date)
+            sorted_emojis = self.emoji_sort(ctx, sort_type, curr_date, past_date)
+
         else:
             reverse_dates = reversed(list(self.model.db[ctx.guild.id]))  # dates for stacks
-            sorted_emojis = self.n_sort(ctx, sort_type, curr_date)
+            sorted_emojis = self.emoji_sort(ctx, sort_type, curr_date)
 
         # set emote font size
         if emote_size >= 70:
@@ -144,18 +145,21 @@ class View(commands.Cog):
 
         # add emoji names, x - values
         for emoji in sorted_emojis:
-            list_names.append(emoji[1])
-            if Y_MAX < emoji[2]:
-                Y_MAX = emoji[2]
+            emote, count = emoji
+            # list_names.append(emoji[1])
+            list_names.append(emote.emoji_obj.name)
+            if Y_MAX < count:
+                Y_MAX = count
         # add frequency, y - values
         for date in reverse_dates:
             print(date)
             for emoji in sorted_emojis:
+                emote, count = emoji
                 try:
                     if is_delta:
-                        temp.append(emoji[2])
+                        temp.append(count)
                     else:
-                        temp.append(getattr(self.model.db[ctx.guild.id][date][emoji[0]], sort_type))
+                        temp.append(getattr(self.model.db[ctx.guild.id][date][emote.emoji_obj.name], sort_type))
                     if temp[-1] > Y_MAX:
                         is_over_max = True
                 # if no entry at that date, add 0
@@ -175,12 +179,11 @@ class View(commands.Cog):
                 for entry_index in range(len(list_vals[list_index])):
                     if list_vals[list_index][entry_index] == list_vals[list_index - 1][entry_index]:
                         list_vals[list_index][entry_index] = 0
-        print(list_vals)
         # add values into bar graph
         for i in range(len(list_vals)):
             plt.bar(ind, list_vals[i], WIDTH, bottom=0)
 
-        if is_over_max:  # todo: might remove limiter
+        if is_over_max:
             plt.ylim([0, Y_MAX + 10])  # y upper limit
         plt.xticks(ind, list_names, fontsize=text_size, rotation=90)  # x tick title values
         plt.xlabel('Emoji')  # x label
@@ -194,7 +197,6 @@ class View(commands.Cog):
         fig.savefig('resources/graph.png', bbox_inches='tight', dpi=900)
         await ctx.send(file=discord.File('resources/graph.png'))
 
-    # todo: legend ordering, ignore 0's (twitch emotes)
     async def graph(self, ctx):
         """
         Creates and sends line graph of data values
@@ -216,8 +218,6 @@ class View(commands.Cog):
             dates.append(date)
         dates = dates[-MAX_DATES:]
 
-        print(dates)
-
         # temp_db holds list of date & instance count keyed by emoji ID
         for date in dates:
             print(date)
@@ -226,12 +226,6 @@ class View(commands.Cog):
                 if emoji_id not in temp_db.keys():
                     temp_db[emoji_id] = {'date': [], 'count': []}
                 print(emoji_id, ' - ', self.model.db[ctx.guild.id][date][emoji_id].instance_count)
-
-                # if no entry of emoji on that date (newly added emojis)
-                # todo: skipping makes url order incorrect
-                # if emoji_id not in self.model.db[ctx.guild.id][date] or self.model.db[ctx.guild.id][date][emoji_id].instance_count == 0:
-                #     print('\tSKIP')
-                #     continue
 
                 temp_db[emoji_id]['count'].append(self.model.db[ctx.guild.id][date][emoji_id].instance_count)
                 temp_db[emoji_id]['date'].append(date)
@@ -260,8 +254,6 @@ class View(commands.Cog):
                         img.append(HandlerLineImage('resources/emoji.png'))
         legend_obj = dict(zip(lines, img))
 
-        # makes columns of size 10
-        # plt.legend(handler_map=legend_obj, ncol=math.ceil(len(lines) / 10))
         plt.legend(handler_map=legend_obj)  # legend
 
         plt.grid(True)  # grid lines
@@ -274,26 +266,6 @@ class View(commands.Cog):
         plt.draw()
         fig.savefig('resources/graph.png', bbox_inches='tight')
         await ctx.send(file=discord.File('resources/graph.png'))
-
-    def n_sort(self, ctx, sort_type, date1, date2=None):
-        """
-        Sorts db entry at given date by sort type
-        @param ctx: Discord context
-        @param sort_type: String "instance_count", "total_count"
-        @param date1: Datetime latest date
-        @param date2: Datetime past date
-        @return: List (Int emoji ID, String emoji name, Int frequency)
-        """
-        sorted_emojis = []
-        cur_emojis = self.model.db[ctx.guild.id][date1]
-        for emoji in cur_emojis.values():
-            if date2 is not None:
-                sorted_emojis.append([emoji.emoji_obj.id, emoji.emoji_obj.name, getattr(emoji, sort_type) -
-                                      getattr(self.model.db[ctx.guild.id][date2][emoji.emoji_obj.id], sort_type)])
-            else:
-                sorted_emojis.append([emoji.emoji_obj.id, emoji.emoji_obj.name, getattr(emoji, sort_type)])
-        sorted_emojis = sorted(sorted_emojis, key=lambda kv: kv[2], reverse=True)
-        return sorted_emojis
 
     def emoji_sort(self, ctx, sort_type, cur_date, old_date=None):
         """
@@ -308,14 +280,13 @@ class View(commands.Cog):
         cur_emojis = self.model.db[ctx.guild.id][cur_date]
         for emoji in cur_emojis.values():
             if old_date is not None:
-                sorted_emojis.append((emoji.emoji_obj, getattr(emoji, sort_type) -
+                sorted_emojis.append((emoji, getattr(emoji, sort_type) -
                                       getattr(self.model.db[ctx.guild.id][old_date][emoji.emoji_obj.id], sort_type)))
             else:
                 sorted_emojis.append((emoji, getattr(emoji, sort_type)))
         sorted_emojis = sorted(sorted_emojis, key=lambda kv: kv[1], reverse=True)
         return sorted_emojis
 
-    # test for pages with reactions
     async def table(self, ctx, page=0, msg=None):
         """
         Creates an embed of emoji info then sends it
@@ -362,8 +333,8 @@ class View(commands.Cog):
                     continue  # or last entry
 
                 # add into field
-                str_title = str(i + 1 - i % GROUP_LEN + int(_page) * PAGE_LEN) + \
-                            '-' + str(i + 1 + int(_page) * PAGE_LEN)
+                str_title = str(i + 1 - i % GROUP_LEN + int(_page) * PAGE_LEN) + '-' + str(
+                    i + 1 + int(_page) * PAGE_LEN)
                 embed.add_field(name=str_title, value=val, inline=False)
                 val = ''
             return embed
@@ -415,11 +386,11 @@ class HandlerLineImage(HandlerBase):
 
     def create_artists(self, legend, orig_handle,
                        xdescent, ydescent, width, height, fontsize, trans):
-        l = matplotlib.lines.Line2D([xdescent + self.offset, xdescent + (width - self.space) / 3. + self.offset],
-                                    [ydescent + height / 2., ydescent + height / 2.])
-        l.update_from(orig_handle)
-        l.set_clip_on(False)
-        l.set_transform(trans)
+        line = matplotlib.lines.Line2D([xdescent + self.offset, xdescent + (width - self.space) / 3. + self.offset],
+                                       [ydescent + height / 2., ydescent + height / 2.])
+        line.update_from(orig_handle)
+        line.set_clip_on(False)
+        line.set_transform(trans)
 
         bb = Bbox.from_bounds(xdescent + (width + self.space) / 3. + self.offset,
                               ydescent,
@@ -431,4 +402,4 @@ class HandlerLineImage(HandlerBase):
         image.set_data(self.image_data)
 
         self.update_prop(image, orig_handle, legend)
-        return [l, image]
+        return [line, image]
