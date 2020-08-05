@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from collections import defaultdict
 from datetime import datetime
 
 import aiofiles
@@ -73,7 +74,6 @@ class View(commands.Cog):
             print('\t\t - - - -')
         await ctx.send('complete')
 
-    # todo: overlap problems
     async def pie(self, ctx, sort_type="instance_count"):
         """
         Create and display a pie chart of latest emoji stats
@@ -86,12 +86,14 @@ class View(commands.Cog):
 
         # sort into list
         sorted_emojis = self.emoji_sort(ctx, sort_type, list(self.model.db[ctx.guild.id])[-1])
-
-        # add labels and values
+        group_emojis = defaultdict(lambda: '')
         for emoji in sorted_emojis:
             emote, count = emoji
-            labels.append(emote.emoji_obj.name)  # emoji name
-            values.append(count)  # emoji frequency
+            group_emojis[count] += emote.emoji_obj.name + '\n'
+        # group emojis of same count together
+        for count, emote in group_emojis.items():
+            labels.append(emote)
+            values.append(count)
 
         fig, ax = plt.subplots()
         ax.pie(values, labels=labels, autopct='%1.1f%%')
