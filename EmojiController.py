@@ -95,27 +95,37 @@ class Controller(commands.Cog):
         await self.view.graph(ctx)
 
     @commands.command('pie')
-    async def pie(self, ctx):
+    async def pie(self, ctx, *arg):
         """
         Creates pie chart of latest data values, calls model for creation
         @param ctx: Discord context
         @return: None
         """
         self.logger.info('[COMMAND] - pie()')
-        await self.view.pie(ctx)
+        sort_type = 'instance_count'
+        if 'total' in arg:
+            sort_type = 'total_count'
+        await self.view.pie(ctx, sort_type)
 
     @commands.command()
-    async def table(self, ctx, *args):
+    async def table(self, ctx, *arg):
         """
         Creates table of all values formatted in descending order, calls model for creation
         @param ctx: Discord context
         @return: None
         """
         self.logger.info('[COMMAND] - table()')
-        await self.view.table(ctx, 0 if args == () else int(args[0]) - 1)
+        page = 0
+        sort_type = 'instance_count'
+        for arg in arg:
+            try:
+                page = int(arg) - 1
+            except ValueError:
+                pass
+        if 'total' in arg:
+            sort_type = 'total_count'
+        await self.view.table(ctx, sort_type=sort_type, page=page)
 
-
-    # todo: clean up argument use with extra args input
     @commands.command()
     async def bar(self, ctx, *arg):
         """
@@ -127,11 +137,11 @@ class Controller(commands.Cog):
         @return: None
         """
         self.logger.info('[COMMAND] - bar()')
-        if arg:
-            arg = arg[0]
-            await self.view.bar(ctx, arg)
-        else:
-            await self.view.bar(ctx)
+
+        sort_type = 'instance_count'
+        if 'total' in arg:
+            sort_type = 'total_count'
+        await self.view.bar(ctx, sort_type)
 
     @commands.command('bch')
     async def bar_change(self, ctx, *arg):
@@ -144,8 +154,7 @@ class Controller(commands.Cog):
         @return: None
         """
         self.logger.info('[COMMAND] - bar_change()')
-        if arg:
-            arg = arg[0]
-            await self.view.bar(ctx, arg)
-        else:
-            await self.view.bar(ctx, is_delta=True)
+        sort_type = 'instance_count'
+        if 'total' in arg:
+            sort_type = 'total_count'
+        await self.view.bar(ctx, sort_type, is_delta=True)

@@ -74,17 +74,18 @@ class View(commands.Cog):
         await ctx.send('complete')
 
     # todo: overlap problems
-    async def pie(self, ctx):
+    async def pie(self, ctx, sort_type="instance_count"):
         """
         Create and display a pie chart of latest emoji stats
+        @param sort_type: String of type (instance, total)
         @param ctx: discord context
         @return: None
         """
         labels = []
         values = []
 
-        # sort by instance count into list
-        sorted_emojis = self.emoji_sort(ctx, "instance_count", list(self.model.db[ctx.guild.id])[-1])
+        # sort into list
+        sorted_emojis = self.emoji_sort(ctx, sort_type, list(self.model.db[ctx.guild.id])[-1])
 
         # add labels and values
         for emoji in sorted_emojis:
@@ -106,7 +107,7 @@ class View(commands.Cog):
         Creates and sends bar graph of data in descending order
         @param is_delta: Boolean for frequency change option
         @param ctx: Discord context
-        @param sort_type: String of type (instance, total, alpha)
+        @param sort_type: String of type (instance, total)
         @return: None
         """
         list_names = []  # x tick labels
@@ -152,7 +153,6 @@ class View(commands.Cog):
                 Y_MAX = count
         # add frequency, y - values
         for date in reverse_dates:
-            print(date)
             for emoji in sorted_emojis:
                 emote, count = emoji
                 try:
@@ -163,8 +163,8 @@ class View(commands.Cog):
                     if temp[-1] > Y_MAX:
                         is_over_max = True
                 # if no entry at that date, add 0
+                # e is the name of the emoji
                 except KeyError as e:
-                    print(e)
                     temp.append(0)
             # add dates to legend, 5 entries
             if counter < NB_ENTRIES:
@@ -209,7 +209,7 @@ class View(commands.Cog):
         lines = []  # graph lines
         img = []
         temp_db = {}
-        legend_countr = 0
+        legend_counter = 0
         MAX_LEGEND_COUNT = 10
         MAX_DATES = 5
 
@@ -234,13 +234,13 @@ class View(commands.Cog):
         print(temp_db)
 
         for emoji, db_content in temp_db.items():
-            if legend_countr < MAX_LEGEND_COUNT:
+            if legend_counter < MAX_LEGEND_COUNT:
                 line, = plt.plot(db_content['date'], db_content['count'], marker='.',
                                  label=' - ' + ctx.bot.get_emoji(emoji).name)
             else:
                 line, = plt.plot(db_content['date'], db_content['count'], marker='.')
             lines.append(line)
-            legend_countr += 1
+            legend_counter += 1
 
         # adding images in the legend
         for i in range(len(url)):
@@ -287,13 +287,14 @@ class View(commands.Cog):
         sorted_emojis = sorted(sorted_emojis, key=lambda kv: kv[1], reverse=True)
         return sorted_emojis
 
-    async def table(self, ctx, page=0, msg=None):
+    async def table(self, ctx, sort_type='instance_count', page=0, msg=None):
         """
         Creates an embed of emoji info then sends it
         waits for emoji reaction response to change page
+        @param sort_type: String "instance_count", "total_count"
         @param ctx: Discord context object
         @param page: page to display
-        @param msg: Discord Message object - edit if present
+        @param msg: Discord Message object for page switching - edit if present
                     None - no Message object made
         @return: None
         """
@@ -301,7 +302,7 @@ class View(commands.Cog):
         GROUP_LEN = 5  # how many entries per group
         TIMEOUT_WAIT = 10  # timer for how long to wait for reaction
 
-        sorted_emojis = self.emoji_sort(ctx, "instance_count", list(self.model.db[ctx.guild.id])[-1])
+        sorted_emojis = self.emoji_sort(ctx, sort_type, list(self.model.db[ctx.guild.id])[-1])
         total_count = sum([x[1] for x in sorted_emojis])
 
         def embed_maker(_page=0):
@@ -371,9 +372,9 @@ class View(commands.Cog):
         else:  # true
             await clear()
             if reaction.emoji == u'\u23ea':  # next page
-                await self.table(ctx, page - 1, msg)
+                await self.table(ctx, sort_type, page - 1, msg)
             elif reaction.emoji == u'\u23e9':  # previous page
-                await self.table(ctx, page + 1, msg)
+                await self.table(ctx, sort_type, page + 1, msg)
 
 
 class HandlerLineImage(HandlerBase):
