@@ -115,7 +115,7 @@ class Model(commands.Cog):
     async def log_channel(self, channel, start_date=None):
         """
         Main channel logging driver, sets up dates to use
-        @param channel: Discordpy channel target channel
+        @param channel: Discord.py channel target channel
         @param start_date: datetime start date
         @return: None
         """
@@ -135,13 +135,13 @@ class Model(commands.Cog):
     async def log_emoji(self, channel, date_after, date_stop, date_list):
         """
         Compile emojis in given channel between given dates
-        @param channel: Discordpy channel target channel
+        @param channel: Discord.py channel target channel
         @param date_after: datetime date target after date
         @param date_stop: datetime date target stop date
         @param date_list: datetime list of dates to go through
         @return: None
         """
-        self.logger.debug('LOGGING')
+        self.logger.debug('LOGGING ' + str(channel) + ' [' + str(date_after) + ' - ' + str(date_stop) + ' ]')
         date_index = 0
         date_max_index = len(date_list) - 1
         # go through channel history
@@ -151,7 +151,6 @@ class Model(commands.Cog):
                 date_index = date_index + 1
 
                 if date_index > date_max_index:
-                    # print('STOP')
                     self.logger.debug('Over max index - Stop')
                     return
             # skip if message from the bot
