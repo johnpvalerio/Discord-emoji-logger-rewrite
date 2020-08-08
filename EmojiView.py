@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 from collections import defaultdict
 from datetime import datetime
 
@@ -40,9 +41,12 @@ def perc(val, total):
 
 
 def format_value(emoji, count, total):
+    date_created = emoji.emoji_obj.created_at
+    today = datetime.now()
     return str(emoji.emoji_obj) + ': **' + str(count) + '** (' + str(perc(count, total)) + '%) | ' + \
-           emoji.emoji_obj.created_at.strftime('%Y-%m-%d') + \
-           ' (' + str((datetime.now() - emoji.emoji_obj.created_at).days) + ' days)'
+           date_created.strftime('%Y-%m-%d') + \
+           ' (' + str((today - date_created).days) + ' days - ' + \
+           str('%.4f' % (count / (today - date_created).days)).rstrip('0').rstrip('.') + ' use/day)'
 
 
 class View(commands.Cog):
@@ -61,6 +65,7 @@ class View(commands.Cog):
         """
         await ctx.send(msg)
 
+    # todo: if old emoji is now removed, it doesnt have an object
     async def db(self, ctx):
         """
         Prints all contents of data values ordered by dates
@@ -295,7 +300,7 @@ class View(commands.Cog):
         waits for emoji reaction response to change page
         @param sort_type: String "instance_count", "total_count"
         @param ctx: Discord context object
-        @param page: page to display
+        @param page: page to display (index start at 0)
         @param msg: Discord Message object for page switching - edit if present
                     None - no Message object made
         @return: None
@@ -305,7 +310,12 @@ class View(commands.Cog):
         TIMEOUT_WAIT = 10  # timer for how long to wait for reaction
 
         sorted_emojis = self.emoji_sort(ctx, sort_type, list(self.model.db[ctx.guild.id])[-1])
-        total_count = sum([x[1] for x in sorted_emojis])
+        total_count = sum([x[1] for x in sorted_emojis])  # total emoji count use
+        max_page = math.ceil(len(sorted_emojis) / PAGE_LEN) - 1  # max page range
+
+        # defaults to page 0, if over maximum page number
+        if page > max_page:
+            page = 0
 
         def embed_maker(_page=0):
             """
@@ -320,8 +330,7 @@ class View(commands.Cog):
             embed.set_thumbnail(url=str(ctx.guild.icon_url))
             embed.set_footer(text='page ' + str(_page + 1) + '/ ' + str(int(len(sorted_emojis) / PAGE_LEN) + 1))
 
-            MAX_RANGE = PAGE_LEN \
-                if (PAGE_LEN * int(_page) + PAGE_LEN <= len(sorted_emojis)) \
+            MAX_RANGE = PAGE_LEN if (PAGE_LEN * int(_page) + PAGE_LEN <= len(sorted_emojis)) \
                 else len(sorted_emojis) - PAGE_LEN * int(_page)
 
             if MAX_RANGE < 0 or _page < 0:
