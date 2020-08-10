@@ -65,17 +65,20 @@ class View(commands.Cog):
         """
         await ctx.send(msg)
 
-    # todo: if old emoji is now removed, it doesnt have an object
     async def db(self, ctx):
         """
         Prints all contents of data values ordered by dates
         @param ctx: Discord context
         @return: None
         """
-        for date, val2 in self.model.db[ctx.guild.id].items():
+        for date, _ in self.model.db[ctx.guild.id].items():
             print(date)
             for emoji_ID, emoji_obj in self.model.db[ctx.guild.id][date].items():
-                print('\t', emoji_obj.emoji_obj.name, ': ', emoji_obj.instance_count, ' - ', emoji_obj.total_count)
+                # if an old emoji is removed but entry exists, it won't have a discord emoji object, ignore
+                try:
+                    print('\t', emoji_obj.emoji_obj.name, ': ', emoji_obj.instance_count, ' - ', emoji_obj.total_count)
+                except AttributeError:
+                    continue
             print('\t\t - - - -')
         await ctx.send('complete')
 
@@ -170,8 +173,7 @@ class View(commands.Cog):
                     if temp[-1] > Y_MAX:
                         is_over_max = True
                 # if no entry at that date, add 0
-                # e is the name of the emoji
-                except KeyError as e:
+                except KeyError:
                     temp.append(0)
             # add dates to legend, 5 entries
             if counter < NB_ENTRIES:
@@ -286,6 +288,11 @@ class View(commands.Cog):
         sorted_emojis = []
         cur_emojis = self.model.db[ctx.guild.id][cur_date]
         for emoji in cur_emojis.values():
+            # if an old emoji is removed but entry exists, it won't have a discord emoji object, ignore
+            try:
+                emoji.emoji_obj.id
+            except AttributeError:
+                continue
             if old_date is not None:
                 sorted_emojis.append((emoji, getattr(emoji, sort_type) -
                                       getattr(self.model.db[ctx.guild.id][old_date][emoji.emoji_obj.id], sort_type)))
@@ -328,7 +335,7 @@ class View(commands.Cog):
 
             embed = discord.Embed(title=ctx.guild.name + '\'s emoji stats')
             embed.set_thumbnail(url=str(ctx.guild.icon_url))
-            embed.set_footer(text='page ' + str(_page + 1) + '/ ' + str(int(len(sorted_emojis) / PAGE_LEN) + 1))
+            embed.set_footer(text='page ' + str(_page + 1) + '/ ' + str(max_page + 1))
 
             MAX_RANGE = PAGE_LEN if (PAGE_LEN * int(_page) + PAGE_LEN <= len(sorted_emojis)) \
                 else len(sorted_emojis) - PAGE_LEN * int(_page)
@@ -361,7 +368,7 @@ class View(commands.Cog):
         # add reaction buttons
         if page != 0:
             await msg.add_reaction('\u23ea')  # <<
-        if page != int(len(sorted_emojis) / PAGE_LEN):
+        if page != max_page and max_page != 0:
             await msg.add_reaction('\u23e9')  # >>
 
         async def clear():

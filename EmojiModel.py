@@ -78,7 +78,6 @@ class Model(commands.Cog):
         self.db[guild_id] = {}
         await self.prepare_db(guild_id)
 
-    # note: emoji dates added isn't reflected in data logged
     async def prepare_db(self, guild_id, start_date=None):
         """
         Sets database db to contain date & server emojis
@@ -257,10 +256,13 @@ class Model(commands.Cog):
         """
         self.logger.debug('CONVERTING DB')
         temp_db = {}
+        # iterate over guilds
         for guild in database:
             temp_date = {}
+            # iterates over date
             for date in database[guild]:
                 temp_emoji = {}
+                # iterate over emoji
                 for emoji_id in database[guild][date]:
                     inst = database[guild][date][emoji_id]['instance_count']
                     tot = database[guild][date][emoji_id]['total_count']
